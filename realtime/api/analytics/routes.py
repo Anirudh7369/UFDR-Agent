@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import logging
@@ -8,28 +7,15 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from utils.time import is_valid_timestamp
 from utils.ai.agent import create_forensic_agent
-import openai
-from agents import Runner
+from schemas.opbects import AnalyticsPayload, AnalyticsResponse
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Define the model
-model = "gemini-2.5-pro"
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-class AnalyticsPayload(BaseModel):
-    query: str
-    current_timestamp: Optional[str]
-    session_id: Optional[str]
-    email_id: Optional[str]
-
-@router.post("/analytics")
-async def analytics_endpoint(payload: AnalyticsPayload) -> Dict[str, Any]:
+@router.post("/analytics", response_model=AnalyticsResponse)
+async def analytics_endpoint(payload: AnalyticsPayload) -> AnalyticsResponse:
     """
     Analytics endpoint that receives data from the frontend.
     
@@ -59,19 +45,22 @@ async def analytics_endpoint(payload: AnalyticsPayload) -> Dict[str, Any]:
         agent_response = await agent.analyze_forensic_data(payload.query)
 
         # Process the analytics data here
-        response_data = {
-            "message": agent_response,
-            "status": "success",
-            "response": {
+        response_data = AnalyticsResponse(
+            message=agent_response,
+            status="success",
+            response={
                 "query": query,
             },
-            "session_id": payload.session_id
-        }
+            session_id=payload.session_id,
+            status_code=200
+        )
         
         return response_data
         
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to process analytics data: {str(e)}"
-        }
+        return AnalyticsResponse(
+            status="error",
+            message=f"Failed to process analytics data: {str(e)}",
+            session_id=payload.session_id,
+            status_code=500
+        )

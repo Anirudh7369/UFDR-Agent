@@ -4,4 +4,8 @@ uvicorn
 pydantic>=2.5.0
 python-dotenv>=1.0.0
 openai==1.78.0
-openai-agents
+openai-agents[litellm]
+litellm[proxy]
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0

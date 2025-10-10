@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from utils.time import is_valid_timestamp
-from utils.ai.agent import get_agent
+from utils.ai.agent import create_forensic_agent
 import openai
 from agents import Runner
 from dotenv import load_dotenv
@@ -52,13 +52,15 @@ async def analytics_endpoint(payload: AnalyticsPayload) -> Dict[str, Any]:
                 "status": "error",
                 "message": f"Invalid timestamp format. Expected format: YYYY-MM-DDTHH:mm:SSZ. Example: {now.strftime('%Y-%m-%dT%H:%M:%SZ')}"
             }
-        
-        agent = get_agent(model=model)
-        result = await Runner.run(agent, query)
+
+        agent = await create_forensic_agent()
+
+        # Process the query using the agent
+        agent_response = await agent.analyze_forensic_data(payload.query)
 
         # Process the analytics data here
         response_data = {
-            "message": result,
+            "message": agent_response,
             "status": "success",
             "response": {
                 "query": query,

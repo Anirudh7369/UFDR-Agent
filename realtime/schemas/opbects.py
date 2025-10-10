@@ -14,3 +14,4 @@ class AnalyticsResponse(BaseModel):
     status: str
     response: Dict[str, Any]
     session_id: Optional[str]
+    status_code: Optional[int] = 200

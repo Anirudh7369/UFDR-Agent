@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from api.analytics import router as analytics_router
 from dotenv import load_dotenv
 load_dotenv()
@@ -7,6 +8,15 @@ app = FastAPI(
     title="UFDR Real-time API",
     description="Real-time analytics API for UFDR Agent",
     version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include the analytics router

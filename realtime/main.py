@@ -1,8 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+<<<<<<< HEAD
 from api.analytics import router as analytics_router
 from api.ufdr_report import router as ufdr_report_router
+=======
+from realtime.api.analytics import router as analytics_router
+>>>>>>> 21e5719 (File upload to MinIO)
 from dotenv import load_dotenv
+from realtime.api.uploads.routes import router as uploads_router
 load_dotenv()
 
 app = FastAPI(
@@ -23,8 +28,12 @@ app.add_middleware(
 # Include the analytics router
 app.include_router(analytics_router, prefix="/api")
 
+<<<<<<< HEAD
 # Include the UFDR report router
 app.include_router(ufdr_report_router, prefix="/api")
+=======
+app.include_router(uploads_router)
+>>>>>>> 21e5719 (File upload to MinIO)
 
 @app.get("/")
 async def root():

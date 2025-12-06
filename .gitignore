@@ -214,3 +214,21 @@ uploads/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Runtime data (MinIO, Redis, uploads)
+realtime/data/
+realtime/data/**
+
+# local docker-compose copies
+realtime/docker-compose.minio*.yml
+
+# local worker copies (duplicates)
+realtime/worker/*_2.py
+
+# local test files
+small*.txt
+
+# editor + python build artifacts
+.vscode/
+__pycache__/
+*.pyc

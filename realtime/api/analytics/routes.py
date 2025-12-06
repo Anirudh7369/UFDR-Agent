@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from utils.time import is_valid_timestamp
 from utils.ai.agent import create_forensic_agent
-from schemas.opbects import AnalyticsPayload, AnalyticsResponse
+from schemas.objects import AnalyticsPayload, AnalyticsResponse
 from dotenv import load_dotenv
 
 load_dotenv()

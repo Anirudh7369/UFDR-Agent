@@ -15,3 +15,10 @@ class AnalyticsResponse(BaseModel):
     response: Dict[str, Any]
     session_id: Optional[str]
     status_code: Optional[int] = 200
+
+
+class UFDRUploadResponse(BaseModel):
+    status: str
+    file_info: Dict[str, Any]
+    file_id: Optional[str]
+    status_code: Optional[int] = 200

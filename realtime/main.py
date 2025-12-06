@@ -1,13 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-<<<<<<< HEAD
-from api.analytics import router as analytics_router
-from api.ufdr_report import router as ufdr_report_router
-=======
+
 from realtime.api.analytics import router as analytics_router
->>>>>>> 21e5719 (File upload to MinIO)
+from realtime.api.ufdr_report import router as ufdr_report_router
+
 from dotenv import load_dotenv
 from realtime.api.uploads.routes import router as uploads_router
+
 load_dotenv()
 
 app = FastAPI(

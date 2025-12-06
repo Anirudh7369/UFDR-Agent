@@ -28,12 +28,9 @@ app.add_middleware(
 # Include the analytics router
 app.include_router(analytics_router, prefix="/api")
 
-<<<<<<< HEAD
 # Include the UFDR report router
 app.include_router(ufdr_report_router, prefix="/api")
-=======
 app.include_router(uploads_router)
->>>>>>> 21e5719 (File upload to MinIO)
 
 @app.get("/")
 async def root():

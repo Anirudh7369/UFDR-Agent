@@ -232,3 +232,4 @@ small*.txt
 .vscode/
 __pycache__/
 *.pyc
+realtime/api/data/

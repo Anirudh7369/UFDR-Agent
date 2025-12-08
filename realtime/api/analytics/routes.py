@@ -7,6 +7,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from utils.time import is_valid_timestamp
 from utils.ai.agent import create_forensic_agent
+from utils.db import save_feedback
 from schemas.objects import AnalyticsPayload, AnalyticsResponse
 from dotenv import load_dotenv
 
@@ -73,7 +74,23 @@ async def analytics_endpoint(payload: AnalyticsPayload) -> AnalyticsResponse:
             session_id=payload.session_id,
             status_code=200
         )
-        
+
+        # Save feedback to database
+        try:
+            await save_feedback(
+                session_id=payload.session_id,
+                email_id=payload.email_id,
+                timestamp=current_timestamp,
+                query=query,
+                generated_payload={"query": query},
+                response=agent_response
+            )
+            logger.info(f"Feedback saved to database for session_id: {payload.session_id}")
+        except Exception as db_error:
+            # Log the error but don't fail the request
+            logger.error(f"Failed to save feedback to database: {str(db_error)}", exc_info=True)
+            print(f"[WARNING] Failed to save feedback to database: {str(db_error)}")
+
         return response_data
         
     except Exception as e:

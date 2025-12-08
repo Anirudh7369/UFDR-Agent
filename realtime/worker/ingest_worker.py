@@ -235,22 +235,16 @@ def process_upload(upload_id: str, bucket: str, key: str):
         }
         _update_record(upload_id, {"ingest": ingest_summary, "ingest_status": "done", "ingest_completed_at": now})
 
-        # If this is a UFDR file, trigger Installed Apps extraction
+        # If this is a UFDR file, trigger Installed Apps and Call Logs extraction
         if is_ufdr_file:
-            from urllib.parse import quote
-
-            # Construct MinIO URL for the UFDR file
-            # Format: http://localhost:9000/bucket/key
-            encoded_key = quote(key, safe='/')  # URL encode the key
-            minio_url = f"{S3_ENDPOINT}/{bucket}/{encoded_key}"
-
-            print(f"[worker] MinIO URL: {minio_url}")
+            # Use the already-downloaded tmpfile to avoid re-downloading the 8GB file
+            print(f"[worker] Using local UFDR file: {tmpfile}")
 
             # Extract Installed Apps data
             print("[worker] Starting Installed Apps extraction from UFDR...")
             try:
                 from realtime.worker.ufdr_apps_extractor import extract_apps_from_ufdr
-                extract_apps_from_ufdr(upload_id, minio_url)
+                extract_apps_from_ufdr(upload_id, tmpfile)
                 print("[worker] Installed Apps extraction completed successfully")
                 _hset_progress(job_progress_key, {"apps_extracted": "true"})
             except Exception as e:
@@ -262,7 +256,7 @@ def process_upload(upload_id: str, bucket: str, key: str):
             print("[worker] Starting Call Logs extraction from UFDR...")
             try:
                 from realtime.worker.ufdr_call_logs_extractor import extract_call_logs_from_ufdr
-                extract_call_logs_from_ufdr(upload_id, minio_url)
+                extract_call_logs_from_ufdr(upload_id, tmpfile)
                 print("[worker] Call Logs extraction completed successfully")
                 _hset_progress(job_progress_key, {"status": "done", "call_logs_extracted": "true"})
             except Exception as e:

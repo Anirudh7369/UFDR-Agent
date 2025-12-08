@@ -42,6 +42,8 @@ Successfully implemented a complete **WhatsApp data extraction pipeline** from U
 ### 3. UFDR Extractor ([realtime/worker/ufdr_whatsapp_extractor.py](../realtime/worker/ufdr_whatsapp_extractor.py))
 
 **Features:**
+- ✅ **Supports both local file paths and MinIO URLs**
+- ✅ Automatically downloads UFDR files from MinIO when given URL
 - ✅ Extracts WhatsApp databases from UFDR archives
 - ✅ Supports multiple WhatsApp SQLite schemas:
   - Old schema: `messages` table
@@ -59,12 +61,13 @@ Successfully implemented a complete **WhatsApp data extraction pipeline** from U
 - ✅ Automatic deduplication across multiple databases
 - ✅ Type-safe conversions (all integers properly handled)
 - ✅ Comprehensive error handling
-- ✅ Automatic cleanup of temp files
+- ✅ Automatic cleanup of temp files (including downloaded files)
 
 ### 4. Integration ([realtime/worker/ingest_worker.py](../realtime/worker/ingest_worker.py))
 
 **Updates:**
 - ✅ Automatic UFDR file detection (checks for `report.xml` and `files/Database/`)
+- ✅ **Passes MinIO URL to extractor (instead of local tmpfile)**
 - ✅ Triggers WhatsApp extraction after file upload
 - ✅ Progress tracking via Redis
 - ✅ Non-blocking (doesn't fail main job if extraction fails)

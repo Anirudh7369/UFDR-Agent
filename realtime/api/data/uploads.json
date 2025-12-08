@@ -1,0 +1,19 @@
+{
+  "d0eb3ba1-96c9-4ad4-a673-c4c18b29aa11": {
+    "upload_id": "d0eb3ba1-96c9-4ad4-a673-c4c18b29aa11",
+    "s3_upload_id": "OTM0NGFhMDItYzc0YS00ZDdhLWI5N2QtZjdlODE4YzY0ODgzLmM2OGRkYzU5LWQ3NGMtNDhmYy1iNjhkLTM5OTBhYjlmZTM1NngxNzY1MTk5ODA0OTQyNTc4ODQw",
+    "key": "uploads/d0eb3ba1-96c9-4ad4-a673-c4c18b29aa11/Google G013A Pixel 3 Android11_2023-06-07_Report.ufdr",
+    "bucket": "ufdr-uploads",
+    "filename": "Google G013A Pixel 3 Android11_2023-06-07_Report.ufdr",
+    "size": 8043773435,
+    "session_id": "web-session",
+    "metadata": {},
+    "part_size": 67108864,
+    "total_parts": 120,
+    "parts_generated": 120,
+    "status": "uploaded",
+    "created_at": "2025-12-08T13:16:44.980331Z",
+    "completed_at": "2025-12-08T13:17:47.922913Z",
+    "location": "http://localhost:9000/ufdr-uploads/uploads/d0eb3ba1-96c9-4ad4-a673-c4c18b29aa11/Google%20G013A%20Pixel%203%20Android11_2023-06-07_Report.ufdr"
+  }
+}

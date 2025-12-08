@@ -89,16 +89,23 @@ Convenient view joining messages with chats and contacts for easy querying.
 
 ### Manual Extraction
 
-To manually extract WhatsApp data from a UFDR file:
+To manually extract WhatsApp data from a UFDR file (supports both local files and MinIO URLs):
 
 ```bash
-python scripts/run_whatsapp_extraction.py <ufdr_file_path> <upload_id>
+python scripts/run_whatsapp_extraction.py <ufdr_file_path_or_url> <upload_id>
 ```
 
-Example:
+Example with local file:
 ```bash
 python scripts/run_whatsapp_extraction.py \
     realtime/uploads/ufdr_files/report.ufdr \
+    investigation-2024-001
+```
+
+Example with MinIO URL:
+```bash
+python scripts/run_whatsapp_extraction.py \
+    "http://localhost:9000/ufdr-uploads/uploads/d0eb3ba1-96c9-4ad4-a673-c4c18b29aa11/report.ufdr" \
     investigation-2024-001
 ```
 
@@ -111,7 +118,8 @@ When files are uploaded through the API:
 3. Upload is completed via `/api/uploads/{upload_id}/complete`
 4. Ingest worker processes the file
 5. If UFDR format is detected, WhatsApp extraction runs automatically
-6. Data is inserted into PostgreSQL
+6. **The extractor downloads the file directly from MinIO using the URL**
+7. Data is inserted into PostgreSQL
 
 Progress can be monitored via `/api/uploads/{upload_id}/ingest-progress`
 

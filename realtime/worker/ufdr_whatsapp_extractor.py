@@ -17,6 +17,8 @@ from typing import Dict, List, Any, Optional, Tuple
 import logging
 import asyncio
 from datetime import datetime
+import urllib.parse
+import urllib.request
 
 # Configure logging
 logging.basicConfig(
@@ -30,28 +32,71 @@ logger = logging.getLogger(__name__)
 class UFDRWhatsAppExtractor:
     """
     Extracts WhatsApp data from UFDR files and loads it into PostgreSQL.
+    Supports both local file paths and MinIO/S3 URLs.
     """
 
-    def __init__(self, ufdr_path: str, upload_id: str):
+    def __init__(self, ufdr_path_or_url: str, upload_id: str):
         """
         Initialize the extractor.
 
         Args:
-            ufdr_path: Path to the UFDR file
+            ufdr_path_or_url: Path to the UFDR file or MinIO URL
             upload_id: Unique identifier for this upload/extraction
         """
-        self.ufdr_path = ufdr_path
+        self.ufdr_source = ufdr_path_or_url
         self.upload_id = upload_id
         self.temp_dir = None
         self.extracted_dbs = []
+        self.ufdr_path = None  # Will be set after download if URL
+        self.is_url = self._is_url(ufdr_path_or_url)
+
+    def _is_url(self, path: str) -> bool:
+        """Check if the path is a URL."""
+        return path.startswith('http://') or path.startswith('https://')
+
+    def _download_from_url(self, url: str) -> str:
+        """
+        Download UFDR file from MinIO URL to temporary file.
+
+        Args:
+            url: MinIO URL to download from
+
+        Returns:
+            str: Path to downloaded temporary file
+        """
+        try:
+            logger.info(f"Downloading UFDR file from: {url}")
+
+            # Create temp file
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.ufdr', prefix='ufdr_download_')
+            os.close(temp_fd)
+
+            # Download file
+            urllib.request.urlretrieve(url, temp_path)
+
+            file_size = os.path.getsize(temp_path)
+            logger.info(f"Downloaded UFDR file: {file_size} bytes to {temp_path}")
+
+            return temp_path
+
+        except Exception as e:
+            logger.error(f"Failed to download UFDR file from URL: {e}", exc_info=True)
+            raise
 
     def extract_whatsapp_databases(self) -> List[str]:
         """
         Extract WhatsApp SQLite databases from the UFDR file.
+        Handles both local files and MinIO URLs.
 
         Returns:
             List of paths to extracted database files
         """
+        # Download from URL if needed
+        if self.is_url:
+            self.ufdr_path = self._download_from_url(self.ufdr_source)
+        else:
+            self.ufdr_path = self.ufdr_source
+
         logger.info(f"Extracting WhatsApp databases from {self.ufdr_path}")
 
         # Create temp directory
@@ -449,13 +494,22 @@ class UFDRWhatsAppExtractor:
         return call_logs
 
     def cleanup(self):
-        """Clean up temporary files."""
+        """Clean up temporary files including downloaded UFDR file if from URL."""
+        # Clean up temp directory
         if self.temp_dir and os.path.exists(self.temp_dir):
             try:
                 shutil.rmtree(self.temp_dir)
                 logger.info(f"Cleaned up temp directory: {self.temp_dir}")
             except Exception as e:
                 logger.error(f"Error cleaning up temp directory: {e}")
+
+        # Clean up downloaded file if it was from URL
+        if self.is_url and self.ufdr_path and os.path.exists(self.ufdr_path):
+            try:
+                os.remove(self.ufdr_path)
+                logger.info(f"Cleaned up downloaded UFDR file: {self.ufdr_path}")
+            except Exception as e:
+                logger.error(f"Error cleaning up downloaded UFDR file: {e}")
 
     async def extract_and_load(self, db_operations_module):
         """

@@ -240,9 +240,17 @@ def process_upload(upload_id: str, bucket: str, key: str):
             print("[worker] Starting WhatsApp data extraction from UFDR...")
             try:
                 from realtime.worker.ufdr_whatsapp_extractor import extract_whatsapp_from_ufdr
+                from urllib.parse import quote
 
-                # Run WhatsApp extraction
-                extract_whatsapp_from_ufdr(upload_id, tmpfile)
+                # Construct MinIO URL for the UFDR file
+                # Format: http://localhost:9000/bucket/key
+                encoded_key = quote(key, safe='/')  # URL encode the key
+                minio_url = f"{S3_ENDPOINT}/{bucket}/{encoded_key}"
+
+                print(f"[worker] MinIO URL: {minio_url}")
+
+                # Run WhatsApp extraction with MinIO URL
+                extract_whatsapp_from_ufdr(upload_id, minio_url)
                 print("[worker] WhatsApp extraction completed successfully")
 
                 _hset_progress(job_progress_key, {"status": "done", "whatsapp_extracted": "true"})

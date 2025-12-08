@@ -275,7 +275,7 @@ class UFDRCallLogsExtractor:
                                 if call_data['call_timestamp']:
                                     call_data['call_timestamp_dt'] = datetime.fromtimestamp(
                                         call_data['call_timestamp'] / 1000
-                                    ).isoformat()
+                                    )
                         elif field_name == 'Duration':
                             call_data['duration_string'] = value
                             call_data['duration_seconds'] = self.parse_duration(value)

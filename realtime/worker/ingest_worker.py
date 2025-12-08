@@ -134,6 +134,9 @@ def process_upload(upload_id: str, bucket: str, key: str):
     """
     RQ will call this. Streams the object to a temp file and does a simple unzip
     (if zip-like) and extracts filenames and tiny metadata.
+
+    If the file is a UFDR file (Cellebrite), it will also extract WhatsApp data
+    and load it into PostgreSQL.
     """
     print(f"[worker] Starting processing: upload_id={upload_id} bucket={bucket} key={key}")
     job_progress_key = f"ingest_progress:{upload_id}"
@@ -149,6 +152,7 @@ def process_upload(upload_id: str, bucket: str, key: str):
     # temp workspace
     tmpdir = tempfile.mkdtemp(prefix=f"ufdr_{upload_id}_")
     tmpfile = os.path.join(tmpdir, "object.bin")
+    is_ufdr_file = False
 
     try:
         # stream object to temp file
@@ -178,6 +182,16 @@ def process_upload(upload_id: str, bucket: str, key: str):
                 with zipfile.ZipFile(tmpfile, "r") as zf:
                     namelist = zf.namelist()
                     _hset_progress(job_progress_key, {"total": len(namelist)})
+
+                    # Check if this is a UFDR file (Cellebrite format)
+                    # UFDR files contain report.xml and files/Database/ structure
+                    is_ufdr_file = any('report.xml' in name for name in namelist) and \
+                                   any('files/Database/' in name for name in namelist)
+
+                    if is_ufdr_file:
+                        print("[worker] Detected UFDR file (Cellebrite format)")
+                        _hset_progress(job_progress_key, {"status": "processing_ufdr", "message": "Extracting WhatsApp data"})
+
                     # extract up to first 10 small entries and create metadata
                     for i, name in enumerate(namelist[:10], start=1):
                         info = zf.getinfo(name)
@@ -217,12 +231,30 @@ def process_upload(upload_id: str, bucket: str, key: str):
             "ingested_at": now,
             "extracted_count": len(extracted),
             "extracted_samples": extracted,
+            "is_ufdr": is_ufdr_file
         }
         _update_record(upload_id, {"ingest": ingest_summary, "ingest_status": "done", "ingest_completed_at": now})
 
-        # mark complete in redis (processed should be int)
-        processed_val = _hgetint(job_progress_key, "processed")
-        _hset_progress(job_progress_key, {"status": "done", "processed": processed_val})
+        # If this is a UFDR file, trigger WhatsApp extraction
+        if is_ufdr_file:
+            print("[worker] Starting WhatsApp data extraction from UFDR...")
+            try:
+                from realtime.worker.ufdr_whatsapp_extractor import extract_whatsapp_from_ufdr
+
+                # Run WhatsApp extraction
+                extract_whatsapp_from_ufdr(upload_id, tmpfile)
+                print("[worker] WhatsApp extraction completed successfully")
+
+                _hset_progress(job_progress_key, {"status": "done", "whatsapp_extracted": "true"})
+            except Exception as e:
+                print(f"[worker] WhatsApp extraction failed: {e}")
+                _hset_progress(job_progress_key, {"status": "done", "whatsapp_error": str(e)})
+                # Don't fail the entire job if WhatsApp extraction fails
+        else:
+            # mark complete in redis (processed should be int)
+            processed_val = _hgetint(job_progress_key, "processed")
+            _hset_progress(job_progress_key, {"status": "done", "processed": processed_val})
+
         print(f"[worker] Finished processing upload {upload_id}")
 
     except ClientError as e:

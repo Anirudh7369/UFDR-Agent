@@ -268,6 +268,38 @@ class UFDRLocationsExtractor:
                         elif field_name == 'ActivityConfidence':
                             location_data['activity_confidence'] = self.parse_int(value)
 
+                elif tag_name == 'modelField':
+                    field_name = child.get('name')
+
+                    # Parse Position (Coordinate model) - common in UFDR Location models
+                    if field_name == 'Position':
+                        for coord_model in child:
+                            coord_tag = coord_model.tag.split('}')[-1] if '}' in coord_model.tag else coord_model.tag
+                            if coord_tag == 'model' and coord_model.get('type') == 'Coordinate':
+                                # Parse Coordinate fields
+                                for coord_field in coord_model:
+                                    coord_field_tag = coord_field.tag.split('}')[-1] if '}' in coord_field.tag else coord_field.tag
+                                    if coord_field_tag == 'field':
+                                        coord_field_name = coord_field.get('name')
+
+                                        # Get value
+                                        coord_value_elem = None
+                                        for sub in coord_field:
+                                            sub_tag = sub.tag.split('}')[-1] if '}' in sub.tag else sub.tag
+                                            if sub_tag == 'value':
+                                                coord_value_elem = sub
+                                                break
+
+                                        if coord_value_elem is not None:
+                                            coord_value = coord_value_elem.text or ''
+
+                                            if coord_field_name == 'Latitude':
+                                                location_data['latitude'] = self.parse_float(coord_value)
+                                            elif coord_field_name == 'Longitude':
+                                                location_data['longitude'] = self.parse_float(coord_value)
+                                            elif coord_field_name == 'Altitude' or coord_field_name == 'Elevation':
+                                                location_data['altitude'] = self.parse_float(coord_value)
+
             # Only return if we have essential data (at least coordinates or address)
             if location_data['latitude'] or location_data['longitude'] or location_data['address']:
                 return location_data

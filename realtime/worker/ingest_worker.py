@@ -252,11 +252,23 @@ def process_upload(upload_id: str, bucket: str, key: str):
                 from realtime.worker.ufdr_apps_extractor import extract_apps_from_ufdr
                 extract_apps_from_ufdr(upload_id, minio_url)
                 print("[worker] Installed Apps extraction completed successfully")
-                _hset_progress(job_progress_key, {"status": "done", "apps_extracted": "true"})
+                _hset_progress(job_progress_key, {"apps_extracted": "true"})
             except Exception as e:
                 print(f"[worker] Installed Apps extraction failed: {e}")
                 _hset_progress(job_progress_key, {"apps_error": str(e)})
                 # Don't fail the entire job if Apps extraction fails
+
+            # Extract Call Logs data
+            print("[worker] Starting Call Logs extraction from UFDR...")
+            try:
+                from realtime.worker.ufdr_call_logs_extractor import extract_call_logs_from_ufdr
+                extract_call_logs_from_ufdr(upload_id, minio_url)
+                print("[worker] Call Logs extraction completed successfully")
+                _hset_progress(job_progress_key, {"status": "done", "call_logs_extracted": "true"})
+            except Exception as e:
+                print(f"[worker] Call Logs extraction failed: {e}")
+                _hset_progress(job_progress_key, {"call_logs_error": str(e)})
+                # Don't fail the entire job if Call Logs extraction fails
         else:
             # mark complete in redis (processed should be int)
             processed_val = _hgetint(job_progress_key, "processed")

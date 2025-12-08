@@ -235,29 +235,28 @@ def process_upload(upload_id: str, bucket: str, key: str):
         }
         _update_record(upload_id, {"ingest": ingest_summary, "ingest_status": "done", "ingest_completed_at": now})
 
-        # If this is a UFDR file, trigger WhatsApp extraction
+        # If this is a UFDR file, trigger Installed Apps extraction
         if is_ufdr_file:
-            print("[worker] Starting WhatsApp data extraction from UFDR...")
+            from urllib.parse import quote
+
+            # Construct MinIO URL for the UFDR file
+            # Format: http://localhost:9000/bucket/key
+            encoded_key = quote(key, safe='/')  # URL encode the key
+            minio_url = f"{S3_ENDPOINT}/{bucket}/{encoded_key}"
+
+            print(f"[worker] MinIO URL: {minio_url}")
+
+            # Extract Installed Apps data
+            print("[worker] Starting Installed Apps extraction from UFDR...")
             try:
-                from realtime.worker.ufdr_whatsapp_extractor import extract_whatsapp_from_ufdr
-                from urllib.parse import quote
-
-                # Construct MinIO URL for the UFDR file
-                # Format: http://localhost:9000/bucket/key
-                encoded_key = quote(key, safe='/')  # URL encode the key
-                minio_url = f"{S3_ENDPOINT}/{bucket}/{encoded_key}"
-
-                print(f"[worker] MinIO URL: {minio_url}")
-
-                # Run WhatsApp extraction with MinIO URL
-                extract_whatsapp_from_ufdr(upload_id, minio_url)
-                print("[worker] WhatsApp extraction completed successfully")
-
-                _hset_progress(job_progress_key, {"status": "done", "whatsapp_extracted": "true"})
+                from realtime.worker.ufdr_apps_extractor import extract_apps_from_ufdr
+                extract_apps_from_ufdr(upload_id, minio_url)
+                print("[worker] Installed Apps extraction completed successfully")
+                _hset_progress(job_progress_key, {"status": "done", "apps_extracted": "true"})
             except Exception as e:
-                print(f"[worker] WhatsApp extraction failed: {e}")
-                _hset_progress(job_progress_key, {"status": "done", "whatsapp_error": str(e)})
-                # Don't fail the entire job if WhatsApp extraction fails
+                print(f"[worker] Installed Apps extraction failed: {e}")
+                _hset_progress(job_progress_key, {"apps_error": str(e)})
+                # Don't fail the entire job if Apps extraction fails
         else:
             # mark complete in redis (processed should be int)
             processed_val = _hgetint(job_progress_key, "processed")

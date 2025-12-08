@@ -218,6 +218,7 @@ uploads/
 # Runtime data (MinIO, Redis, uploads)
 realtime/data/
 realtime/data/**
+uploads/
 
 # local docker-compose copies
 realtime/docker-compose.minio*.yml
@@ -233,3 +234,6 @@ small*.txt
 __pycache__/
 *.pyc
 realtime/api/data/
+
+# Any env files
+.env.*

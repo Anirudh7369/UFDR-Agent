@@ -54,18 +54,32 @@ async def upload_ufdr_file(
 
         # Validate file extension (temporarily allowing .pdf for testing)
         allowed_extensions = ('.ufdr')
-        if not file.filename.endswith(allowed_extensions):
+        # Validate filename (this also fixes type issues later)
+        if not file.filename:
+            logger.error("Uploaded file has no filename")
+            return UFDRUploadResponse(
+                status="error",
+                file_info={"error": "Uploaded file has no filename"},
+                file_id=file_id,
+                status_code=400,
+            )
+
+        allowed_extensions = (".ufdr",)
+        if not file.filename.lower().endswith(allowed_extensions):
             logger.error(f"Invalid file type: {file.filename}")
             return UFDRUploadResponse(
                 status="error",
                 file_info={"error": "Only .ufdr files are allowed"},
                 file_id=file_id,
-                status_code=400
+                status_code=400,
             )
 
-        # Generate unique filename
-        original_filename = file.filename
-        safe_filename = f"{file_id}_{original_filename}" if file_id else original_filename
+        # At this point, mypy/pylance can safely treat filename as str
+        original_filename: str = file.filename  # type: ignore[assignment]
+
+        safe_filename = (
+            f"{file_id}_{original_filename}" if file_id else original_filename
+        )
         file_path = UPLOAD_DIR / safe_filename
 
         # Stream the file to disk in chunks to handle large files

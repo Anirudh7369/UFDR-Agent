@@ -188,6 +188,9 @@ class UFDRAppsExtractor:
         apps = []
 
         try:
+            # Define namespace - Cellebrite UFDR uses this namespace
+            namespace = {'ns': 'http://pa.cellebrite.com/report/2.0'}
+
             # Parse XML with iterparse to handle large files efficiently
             context = ET.iterparse(report_xml_path, events=('start', 'end'))
             context = iter(context)
@@ -198,18 +201,24 @@ class UFDRAppsExtractor:
             app_count = 0
 
             for event, elem in context:
-                if event == 'end' and elem.tag == 'model' and elem.get('type') == 'InstalledApplication':
-                    app_data = self._parse_app_model(elem)
-                    if app_data:
-                        apps.append(app_data)
-                        app_count += 1
+                # Check for model element with namespace
+                # Element tag will be {http://pa.cellebrite.com/report/2.0}model
+                if event == 'end':
+                    # Remove namespace from tag for comparison
+                    tag_name = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
 
-                        # Log progress every 50 apps
-                        if app_count % 50 == 0:
-                            logger.info(f"Parsed {app_count} apps...")
+                    if tag_name == 'model' and elem.get('type') == 'InstalledApplication':
+                        app_data = self._parse_app_model(elem)
+                        if app_data:
+                            apps.append(app_data)
+                            app_count += 1
 
-                    # Clear element to free memory
-                    elem.clear()
+                            # Log progress every 50 apps
+                            if app_count % 50 == 0:
+                                logger.info(f"Parsed {app_count} apps...")
+
+                        # Clear element to free memory
+                        elem.clear()
 
             logger.info(f"Parsed {len(apps)} installed applications")
             return apps
@@ -249,58 +258,72 @@ class UFDRAppsExtractor:
                 'raw_xml': ET.tostring(model_elem, encoding='unicode'),
             }
 
-            # Parse fields
-            for field in model_elem.findall('field'):
-                field_name = field.get('name')
-                field_type = field.get('type')
+            # Parse fields - iterate through all child elements
+            for child in model_elem:
+                # Get tag name without namespace
+                tag_name = child.tag.split('}')[-1] if '}' in child.tag else child.tag
 
-                # Get value
-                value_elem = field.find('value')
-                if value_elem is not None:
-                    value = value_elem.text or ''
+                if tag_name == 'field':
+                    field_name = child.get('name')
+                    field_type = child.get('type')
 
-                    if field_name == 'Name':
-                        app_data['app_name'] = value
-                    elif field_name == 'Version':
-                        app_data['app_version'] = value
-                    elif field_name == 'Identifier':
-                        app_data['app_identifier'] = value
-                    elif field_name == 'AppGUID':
-                        app_data['app_guid'] = value if value else None
-                    elif field_name == 'PurchaseDate':
-                        timestamp_str = value_elem.text
-                        if timestamp_str:
-                            app_data['install_timestamp'] = self.parse_timestamp(timestamp_str)
-                            if app_data['install_timestamp']:
-                                app_data['install_timestamp_dt'] = datetime.fromtimestamp(
-                                    app_data['install_timestamp'] / 1000
-                                ).isoformat()
-                    elif field_name == 'LastLaunched':
-                        timestamp_str = value_elem.text
-                        if timestamp_str:
-                            app_data['last_launched_timestamp'] = self.parse_timestamp(timestamp_str)
-                            if app_data['last_launched_timestamp']:
-                                app_data['last_launched_dt'] = datetime.fromtimestamp(
-                                    app_data['last_launched_timestamp'] / 1000
-                                ).isoformat()
-                    elif field_name == 'DecodingStatus':
-                        app_data['decoding_status'] = value
-                    elif field_name == 'IsEmulatable':
-                        app_data['is_emulatable'] = value.lower() == 'true'
-                    elif field_name == 'OperationMode':
-                        app_data['operation_mode'] = value
+                    # Get value element
+                    value_elem = None
+                    for sub_child in child:
+                        sub_tag = sub_child.tag.split('}')[-1] if '}' in sub_child.tag else sub_child.tag
+                        if sub_tag == 'value':
+                            value_elem = sub_child
+                            break
 
-            # Parse multiField elements
-            for multi_field in model_elem.findall('multiField'):
-                field_name = multi_field.get('name')
-                values = [v.text for v in multi_field.findall('value') if v.text]
+                    if value_elem is not None:
+                        value = value_elem.text or ''
 
-                if field_name == 'Permissions':
-                    app_data['permissions'] = values
-                elif field_name == 'Categories':
-                    app_data['categories'] = values
-                elif field_name == 'AssociatedDirectoryPaths':
-                    app_data['associated_directory_paths'] = values
+                        if field_name == 'Name':
+                            app_data['app_name'] = value
+                        elif field_name == 'Version':
+                            app_data['app_version'] = value
+                        elif field_name == 'Identifier':
+                            app_data['app_identifier'] = value
+                        elif field_name == 'AppGUID':
+                            app_data['app_guid'] = value if value else None
+                        elif field_name == 'PurchaseDate':
+                            timestamp_str = value_elem.text
+                            if timestamp_str:
+                                app_data['install_timestamp'] = self.parse_timestamp(timestamp_str)
+                                if app_data['install_timestamp']:
+                                    app_data['install_timestamp_dt'] = datetime.fromtimestamp(
+                                        app_data['install_timestamp'] / 1000
+                                    ).isoformat()
+                        elif field_name == 'LastLaunched':
+                            timestamp_str = value_elem.text
+                            if timestamp_str:
+                                app_data['last_launched_timestamp'] = self.parse_timestamp(timestamp_str)
+                                if app_data['last_launched_timestamp']:
+                                    app_data['last_launched_dt'] = datetime.fromtimestamp(
+                                        app_data['last_launched_timestamp'] / 1000
+                                    ).isoformat()
+                        elif field_name == 'DecodingStatus':
+                            app_data['decoding_status'] = value
+                        elif field_name == 'IsEmulatable':
+                            app_data['is_emulatable'] = value.lower() == 'true'
+                        elif field_name == 'OperationMode':
+                            app_data['operation_mode'] = value
+
+                elif tag_name == 'multiField':
+                    field_name = child.get('name')
+                    # Get all value elements
+                    values = []
+                    for sub_child in child:
+                        sub_tag = sub_child.tag.split('}')[-1] if '}' in sub_child.tag else sub_child.tag
+                        if sub_tag == 'value' and sub_child.text:
+                            values.append(sub_child.text)
+
+                    if field_name == 'Permissions':
+                        app_data['permissions'] = values
+                    elif field_name == 'Categories':
+                        app_data['categories'] = values
+                    elif field_name == 'AssociatedDirectoryPaths':
+                        app_data['associated_directory_paths'] = values
 
             # Only return if we have at least an identifier
             if app_data['app_identifier']:

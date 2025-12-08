@@ -163,8 +163,8 @@ class UFDRBrowsingExtractor:
                         # Clear element after parsing
                         elem.clear()
 
-                    # Log progress every 100 entries
-                    if entry_count % 100 == 0:
+                    # Log progress every 100 entries (but not at 0)
+                    if entry_count > 0 and entry_count % 100 == 0:
                         logger.info(f"Parsed {entry_count} browsing entries...")
 
             logger.info(f"Parsed {len(visited_pages)} visited pages, "

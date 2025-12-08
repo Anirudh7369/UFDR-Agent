@@ -96,6 +96,11 @@ async def bulk_insert_call_logs(upload_id: str, calls: List[Dict[str, Any]]):
         party_records = []
 
         for call in calls:
+            # Prepare raw_json by converting datetime to string
+            call_json = call.copy()
+            if call_json.get('call_timestamp_dt'):
+                call_json['call_timestamp_dt'] = call_json['call_timestamp_dt'].isoformat()
+
             # Prepare main call record
             record = (
                 upload_id,
@@ -105,7 +110,7 @@ async def bulk_insert_call_logs(upload_id: str, calls: List[Dict[str, Any]]):
                 call.get('call_type'),
                 call.get('status'),
                 call.get('call_timestamp'),
-                call.get('call_timestamp_dt'),
+                call.get('call_timestamp_dt'),  # Keep as datetime for database
                 call.get('duration_seconds'),
                 call.get('duration_string'),
                 call.get('country_code'),
@@ -122,7 +127,7 @@ async def bulk_insert_call_logs(upload_id: str, calls: List[Dict[str, Any]]):
                 call.get('deleted_state'),
                 call.get('decoding_confidence'),
                 call.get('raw_xml'),
-                json.dumps(call),  # raw_json
+                json.dumps(call_json),  # raw_json with datetime converted to string
             )
             call_records.append(record)
 

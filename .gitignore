@@ -208,32 +208,6 @@ __marimo__/
 
 # Project specific
 myenv/
-uploads/
-
-# macOS system files
 .DS_Store
-.AppleDouble
-.LSOverride
-
-# Runtime data (MinIO, Redis, uploads)
-realtime/data/
-realtime/data/**
-uploads/
-
-# local docker-compose copies
-realtime/docker-compose.minio*.yml
-
-# local worker copies (duplicates)
-realtime/worker/*_2.py
-
-# local test files
-small*.txt
-
-# editor + python build artifacts
-.vscode/
-__pycache__/
-*.pyc
-realtime/api/data/
-
-# Any env files
-.env.*
+realtime/data/minio/
+realtime/data/redis/

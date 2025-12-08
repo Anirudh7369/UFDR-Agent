@@ -132,7 +132,7 @@ def _hgetint(key: str, field: str) -> int:
 
 def _run_ufdr_extractions(upload_id: str, ufdr_path: str, job_progress_key: str):
     """
-    Run all UFDR extractions (apps, calls, messages) in a single event loop.
+    Run all UFDR extractions (apps, calls, messages, locations) in a single event loop.
 
     This avoids asyncio event loop conflicts when running multiple async extractors sequentially.
     """
@@ -142,7 +142,8 @@ def _run_ufdr_extractions(upload_id: str, ufdr_path: str, job_progress_key: str)
     from realtime.worker.ufdr_apps_extractor import UFDRAppsExtractor
     from realtime.worker.ufdr_call_logs_extractor import UFDRCallLogsExtractor
     from realtime.worker.ufdr_messages_extractor import UFDRMessagesExtractor
-    from realtime.utils.db import apps_operations, call_logs_operations, messages_operations
+    from realtime.worker.ufdr_locations_extractor import UFDRLocationsExtractor
+    from realtime.utils.db import apps_operations, call_logs_operations, messages_operations, locations_operations
 
     async def run_all_extractions():
         """Run all extractions in the same event loop."""
@@ -174,10 +175,21 @@ def _run_ufdr_extractions(upload_id: str, ufdr_path: str, job_progress_key: str)
             messages_extractor = UFDRMessagesExtractor(ufdr_path, upload_id)
             await messages_extractor.extract_and_load(messages_operations)
             print("[worker] Messages extraction completed successfully")
-            _hset_progress(job_progress_key, {"status": "done", "messages_extracted": "true"})
+            _hset_progress(job_progress_key, {"messages_extracted": "true"})
         except Exception as e:
             print(f"[worker] Messages extraction failed: {e}")
             _hset_progress(job_progress_key, {"messages_error": str(e)})
+
+        # Extract location data
+        print("[worker] Starting Location extraction...")
+        try:
+            locations_extractor = UFDRLocationsExtractor(ufdr_path, upload_id)
+            await locations_extractor.extract_and_load(locations_operations)
+            print("[worker] Location extraction completed successfully")
+            _hset_progress(job_progress_key, {"status": "done", "locations_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Location extraction failed: {e}")
+            _hset_progress(job_progress_key, {"locations_error": str(e)})
 
     # Run all extractions in a single event loop
     loop = asyncio.new_event_loop()

@@ -3,6 +3,11 @@ import os
 from typing import Optional
 import logging
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
+load_dotenv(env_path)
 
 logger = logging.getLogger(__name__)
 

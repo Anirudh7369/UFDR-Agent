@@ -19,6 +19,11 @@ import asyncio
 from datetime import datetime
 import urllib.parse
 import urllib.request
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(env_path)
 
 # Configure logging
 logging.basicConfig(
@@ -519,7 +524,10 @@ class UFDRWhatsAppExtractor:
             db_operations_module: The whatsapp_operations module for DB operations
         """
         try:
-            # Create extraction job
+            # Extract databases first (this sets self.ufdr_path)
+            db_files = self.extract_whatsapp_databases()
+
+            # Create extraction job (now self.ufdr_path is set)
             await db_operations_module.create_extraction_job(
                 self.upload_id,
                 os.path.basename(self.ufdr_path)
@@ -530,9 +538,6 @@ class UFDRWhatsAppExtractor:
                 self.upload_id,
                 'processing'
             )
-
-            # Extract databases
-            db_files = self.extract_whatsapp_databases()
 
             if not db_files:
                 logger.warning("No WhatsApp databases found in UFDR file")

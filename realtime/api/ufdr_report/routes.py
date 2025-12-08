@@ -1,254 +1,209 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from typing import Optional
+from fastapi import APIRouter
+from datetime import datetime, timezone
 import logging
 import sys
 import os
-from pathlib import Path
 
-import aiofiles
+# Allow imports from project root
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+from utils.time import is_valid_timestamp
+from utils.ai.agent import create_forensic_agent
+from utils.db import save_feedback
+from schemas.objects import AnalyticsPayload, AnalyticsResponse
+from utils.chat_session import SessionCache
+
 from dotenv import load_dotenv
-from pydantic import BaseModel
-
-import boto3
-from botocore.client import Config
-from botocore.exceptions import ClientError
-
-# ---------------------------------------------------------------------
-# Load environment variables
-# ---------------------------------------------------------------------
 load_dotenv()
 
-# ---------------------------------------------------------------------
-# Logging & router
-# ---------------------------------------------------------------------
+# Configure logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# ---------------------------------------------------------------------
-# Make schema imports work (team folder structure)
-# ---------------------------------------------------------------------
-# Adjusted sys.path only if needed to find `schemas.objects`
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-if ROOT_DIR not in sys.path:
-    sys.path.append(ROOT_DIR)
 
-from schemas.objects import UFDRUploadResponse  # noqa: E402
-
-# ---------------------------------------------------------------------
-# S3 / MinIO configuration
-# ---------------------------------------------------------------------
-S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")
-S3_REGION = os.getenv("S3_REGION", "us-east-1")
-S3_BUCKET_DEFAULT = os.getenv("S3_BUCKET", "ufdr-uploads")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minioadmin")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin")
-
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=S3_ENDPOINT,
-    region_name=S3_REGION,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    config=Config(signature_version="s3v4"),
-)
-
-# ---------------------------------------------------------------------
-# Local-disk upload configuration (legacy teammate flow)
-# ---------------------------------------------------------------------
-UPLOAD_DIR = Path(os.getenv("UFDR_UPLOAD_DIR", "./uploads/ufdr_files"))
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-MAX_FILE_SIZE = 30 * 1024 * 1024 * 1024  # 30 GB
-
-# ---------------------------------------------------------------------
-# Request Model for Bucket-Based Registration
-# ---------------------------------------------------------------------
-class UFDRFromBucketRequest(BaseModel):
-    bucket: Optional[str] = None
-    key: str  # S3 key, e.g., "uploads/<uuid>/report.ufdr"
-    filename: Optional[str] = None
-    file_id: Optional[str] = None
-    session_id: Optional[str] = None
-    email_id: Optional[str] = None
-
-
-# ---------------------------------------------------------------------
-# OPTIONS (CORS preflight)
-# ---------------------------------------------------------------------
-@router.options("/upload-ufdr")
-async def upload_ufdr_options():
+# -------------------------------------------------------------------------
+# CORS preflight handler
+# -------------------------------------------------------------------------
+@router.options("/analytics")
+async def analytics_options():
     return {"status": "ok"}
 
 
-# ---------------------------------------------------------------------
-# DIRECT FILE UPLOAD (legacy disk-based workflow)
-# ---------------------------------------------------------------------
-@router.post("/upload-ufdr", response_model=UFDRUploadResponse)
-async def upload_ufdr_file(
-    file: UploadFile = File(...),
-    file_id: Optional[str] = Form(None),
-    session_id: Optional[str] = Form(None),
-    email_id: Optional[str] = Form(None),
-) -> UFDRUploadResponse:
+# -------------------------------------------------------------------------
+# Session Debug Endpoint
+# -------------------------------------------------------------------------
+@router.get("/session/{session_id}/debug")
+async def debug_session(session_id: str):
     """
-    Legacy endpoint – streams UFDR file to local disk.
+    Debug endpoint to inspect session cache contents.
+    """
+    from utils.ai.redis_client import is_redis_available
 
-    NOTE:
-    - Your new MinIO multipart flow uses /api/uploads/* routes.
-    - This endpoint can coexist; it's just a separate path.
+    try:
+        redis_available = is_redis_available()
+
+        if not redis_available:
+            return {
+                "session_id": session_id,
+                "redis_available": False,
+                "message": "Redis is not available. Session cache is disabled."
+            }
+
+        exists = await SessionCache.session_exists(session_id)
+
+        if not exists:
+            return {
+                "session_id": session_id,
+                "exists": False,
+                "redis_available": True,
+                "message": "Session not found in cache.",
+            }
+
+        count = await SessionCache.get_session_message_count(session_id)
+        messages = await SessionCache.get_messages(session_id)
+
+        return {
+            "session_id": session_id,
+            "exists": True,
+            "message_count": count,
+            "messages": messages,
+            "redis_available": True,
+        }
+
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {e}", exc_info=True)
+        return {
+            "session_id": session_id,
+            "error": str(e),
+            "redis_available": False,
+        }
+
+
+# -------------------------------------------------------------------------
+# Session Clear Endpoint
+# -------------------------------------------------------------------------
+@router.delete("/session/{session_id}")
+async def clear_session(session_id: str):
+    """
+    Clear all cached messages for a session.
+    """
+    from utils.ai.redis_client import is_redis_available
+
+    try:
+        redis_available = is_redis_available()
+
+        if not redis_available:
+            return {
+                "session_id": session_id,
+                "status": "warning",
+                "message": "Redis unavailable — nothing to clear.",
+                "redis_available": False,
+            }
+
+        success = await SessionCache.clear_session(session_id)
+
+        return {
+            "session_id": session_id,
+            "status": "success" if success else "error",
+            "message": "Session cleared successfully" if success else "Failed to clear session",
+            "redis_available": True,
+        }
+
+    except Exception as e:
+        logger.error(f"Error clearing session: {e}", exc_info=True)
+        return {
+            "session_id": session_id,
+            "status": "error",
+            "message": f"Exception: {e}",
+            "redis_available": False,
+        }
+
+
+# -------------------------------------------------------------------------
+# MAIN ANALYTICS ENDPOINT
+# -------------------------------------------------------------------------
+@router.post("/analytics", response_model=AnalyticsResponse)
+async def analytics_endpoint(payload: AnalyticsPayload) -> AnalyticsResponse:
+    """
+    Main analytics endpoint with Redis session caching.
     """
     try:
-        logger.info(
-            f"[REQUEST] Receiving UFDR file -> {file.filename}, "
-            f"file_id={file_id}, session_id={session_id}, email={email_id}"
+        query = payload.query
+        session_id = payload.session_id
+        email_id = payload.email_id
+
+        now = datetime.now(timezone.utc)
+        current_timestamp = (
+            payload.current_timestamp or now.strftime("%Y-%m-%dT%H:%M:%SZ")
         )
 
-        # Validate filename
-        if not file.filename:
-            logger.error("Uploaded file has no filename")
-            return UFDRUploadResponse(
+        # Validate timestamp format
+        if not is_valid_timestamp(current_timestamp):
+            example = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return AnalyticsResponse(
                 status="error",
-                file_info={"error": "Uploaded file has no filename"},
-                file_id=file_id,
+                message=f"Invalid timestamp format. Expected: YYYY-MM-DDTHH:mm:SSZ. Example: {example}",
+                response={},
+                session_id=session_id,
                 status_code=400,
             )
 
-        # Validate extension
-        if not file.filename.lower().endswith(".ufdr"):
-            logger.error(f"Invalid file type: {file.filename}")
-            return UFDRUploadResponse(
-                status="error",
-                file_info={"error": "Only .ufdr files are allowed"},
-                file_id=file_id,
-                status_code=400,
+        # Cache USER message in Redis
+        cached_messages = []
+        if session_id:
+            metadata = {"email_id": email_id} if email_id else None
+
+            await SessionCache.append_message(
+                session_id=session_id,
+                role="user",
+                content=query,
+                metadata=metadata,
             )
 
-        # Build save path
-        original_filename = file.filename
-        safe_filename = (
-            f"{file_id}_{original_filename}" if file_id else original_filename
-        )
-        file_path = UPLOAD_DIR / safe_filename
+            cached_messages = await SessionCache.get_messages(
+                session_id=session_id, limit=10
+            )
 
-        # Stream to disk
-        logger.info(f"Streaming upload to: {file_path}")
-        total_size = 0
-        chunk_size = 10 * 1024 * 1024  # 10 MB
+        # Call the forensic agent (LLM)
+        agent = await create_forensic_agent()
+        agent_response = await agent.analyze_forensic_data(query)
 
-        async with aiofiles.open(file_path, "wb") as f:
-            while True:
-                chunk = await file.read(chunk_size)
-                if not chunk:
-                    break
+        # Cache ASSISTANT message in Redis
+        if session_id:
+            await SessionCache.append_message(
+                session_id=session_id,
+                role="assistant",
+                content=agent_response,
+            )
 
-                total_size += len(chunk)
+        # Save Feedback to DB
+        try:
+            await save_feedback(
+                session_id=session_id,
+                email_id=email_id,
+                timestamp=current_timestamp,
+                query=query,
+                generated_payload={"query": query, "history": cached_messages},
+                response=agent_response,
+            )
+        except Exception as db_err:
+            logger.error(f"DB Save Error: {db_err}", exc_info=True)
 
-                if total_size > MAX_FILE_SIZE:
-                    await f.close()
-                    if file_path.exists():
-                        file_path.unlink()
-
-                    logger.error(f"Upload exceeded max size: {total_size}")
-                    return UFDRUploadResponse(
-                        status="error",
-                        file_info={"error": "File exceeds 30GB limit"},
-                        file_id=file_id,
-                        status_code=413,
-                    )
-
-                await f.write(chunk)
-
-        # Log final size
-        mb = total_size / (1024 * 1024)
-        gb = total_size / (1024 * 1024 * 1024)
-
-        logger.info(f"[SUCCESS] Uploaded {gb:.2f} GB ({mb:.2f} MB)")
-
-        # Return structured response
-        return UFDRUploadResponse(
+        # Build analytics response
+        return AnalyticsResponse(
+            message=agent_response,
             status="success",
-            file_info={
-                "filename": original_filename,
-                "saved_as": safe_filename,
-                "size_bytes": total_size,
-                "size_mb": round(mb, 2),
-                "size_gb": round(gb, 2),
-                "file_path": str(file_path),
-                "content_type": file.content_type,
-            },
-            file_id=file_id,
+            response={"query": query},
+            session_id=session_id,
             status_code=200,
         )
 
     except Exception as e:
-        logger.error(f"[ERROR] {e}", exc_info=True)
-
-        if "file_path" in locals() and file_path.exists():
-            file_path.unlink()
-
-        return UFDRUploadResponse(
+        logger.error(f"Analytics endpoint error: {e}", exc_info=True)
+        return AnalyticsResponse(
             status="error",
-            file_info={"error": str(e)},
-            file_id=file_id,
+            message=f"Processing error: {e}",
+            response={},
+            session_id=payload.session_id,
             status_code=500,
         )
-
-
-# ---------------------------------------------------------------------
-# REGISTER FROM BUCKET (MinIO flow)
-# ---------------------------------------------------------------------
-@router.post("/upload-ufdr/from-bucket", response_model=UFDRUploadResponse)
-async def register_ufdr_from_bucket(
-    body: UFDRFromBucketRequest,
-) -> UFDRUploadResponse:
-    """
-    This is the MinIO-based endpoint:
-
-    - Expects object already uploaded to MinIO (via multipart flow).
-    - Verifies it exists (HEAD).
-    - Returns UFDRUploadResponse with bucket+key so the rest of the pipeline
-      can ingest from MinIO.
-    """
-    bucket = body.bucket or S3_BUCKET_DEFAULT
-    key = body.key
-
-    logger.info(
-        f"[REGISTER] Verify UFDR in bucket={bucket}, key={key}, "
-        f"file_id={body.file_id}, session={body.session_id}"
-    )
-
-    # HEAD request to MinIO
-    try:
-        head = s3_client.head_object(Bucket=bucket, Key=key)
-        size_bytes = head.get("ContentLength", 0)
-        content_type = head.get("ContentType", "application/octet-stream")
-    except ClientError:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Object not found in bucket: {bucket}/{key}",
-        )
-
-    filename = body.filename or os.path.basename(key)
-    mb = size_bytes / (1024 * 1024)
-    gb = size_bytes / (1024 * 1024 * 1024)
-
-    logger.info(f"[SUCCESS] Verified object -> {filename}, {gb:.2f}GB")
-
-    return UFDRUploadResponse(
-        status="success",
-        file_info={
-            "filename": filename,
-            "saved_as": key,
-            "size_bytes": size_bytes,
-            "size_mb": round(mb, 2),
-            "size_gb": round(gb, 2),
-            "file_path": f"s3://{bucket}/{key}",
-            "content_type": content_type,
-            "bucket": bucket,
-            "key": key,
-            "session_id": body.session_id,
-            "email_id": body.email_id,
-        },
-        file_id=body.file_id,
-        status_code=200,
-    )

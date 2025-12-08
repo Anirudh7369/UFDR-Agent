@@ -208,9 +208,6 @@ __marimo__/
 
 # Project specific
 myenv/
-uploads/
-
-# macOS system files
 .DS_Store
-.AppleDouble
-.LSOverride
+realtime/data/minio/
+realtime/data/redis/

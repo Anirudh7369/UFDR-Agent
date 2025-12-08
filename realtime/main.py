@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.analytics import router as analytics_router
-from api.ufdr_report import router as ufdr_report_router
+from realtime.api.analytics import router as analytics_router
 from dotenv import load_dotenv
+from realtime.api.uploads.routes import router as uploads_router
 load_dotenv()
 
 app = FastAPI(
@@ -23,8 +23,7 @@ app.add_middleware(
 # Include the analytics router
 app.include_router(analytics_router, prefix="/api")
 
-# Include the UFDR report router
-app.include_router(ufdr_report_router, prefix="/api")
+app.include_router(uploads_router)
 
 @app.get("/")
 async def root():

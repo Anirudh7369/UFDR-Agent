@@ -128,46 +128,41 @@ class UFDRBrowsingExtractor:
 
         try:
             # Use iterparse for memory-efficient parsing
-            context = ET.iterparse(report_xml_path, events=('start', 'end'))
-            context = iter(context)
-
-            # Get the root element
-            event, root = next(context)
+            context = ET.iterparse(report_xml_path, events=('end',))
 
             entry_count = 0
 
             for event, elem in context:
-                if event == 'end':
-                    # Remove namespace from tag for comparison
-                    tag_name = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+                # Remove namespace from tag for comparison
+                tag_name = elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
 
-                    if tag_name == 'model':
-                        model_type = elem.get('type')
+                if tag_name == 'model':
+                    model_type = elem.get('type')
 
-                        if model_type == 'VisitedPage':
-                            page_data = self._parse_visited_page(elem)
-                            if page_data:
-                                visited_pages.append(page_data)
-                                entry_count += 1
+                    if model_type == 'VisitedPage':
+                        page_data = self._parse_visited_page(elem)
+                        if page_data:
+                            visited_pages.append(page_data)
+                            entry_count += 1
 
-                        elif model_type == 'SearchedItem':
-                            search_data = self._parse_searched_item(elem)
-                            if search_data:
-                                searches.append(search_data)
-                                entry_count += 1
+                    elif model_type == 'SearchedItem':
+                        search_data = self._parse_searched_item(elem)
+                        if search_data:
+                            searches.append(search_data)
+                            entry_count += 1
 
-                        elif model_type == 'WebBookmark':
-                            bookmark_data = self._parse_web_bookmark(elem)
-                            if bookmark_data:
-                                bookmarks.append(bookmark_data)
-                                entry_count += 1
+                    elif model_type == 'WebBookmark':
+                        bookmark_data = self._parse_web_bookmark(elem)
+                        if bookmark_data:
+                            bookmarks.append(bookmark_data)
+                            entry_count += 1
 
-                        # Log progress every 100 entries
-                        if entry_count % 100 == 0:
-                            logger.info(f"Parsed {entry_count} browsing entries...")
+                    # Log progress every 100 entries
+                    if entry_count % 100 == 0:
+                        logger.info(f"Parsed {entry_count} browsing entries...")
 
-                    # Clear element to free memory
-                    elem.clear()
+                # Clear element to free memory
+                elem.clear()
 
             logger.info(f"Parsed {len(visited_pages)} visited pages, "
                        f"{len(searches)} searches, {len(bookmarks)} bookmarks")

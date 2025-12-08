@@ -144,25 +144,28 @@ class UFDRBrowsingExtractor:
                         if page_data:
                             visited_pages.append(page_data)
                             entry_count += 1
+                        # Clear element after parsing
+                        elem.clear()
 
                     elif model_type == 'SearchedItem':
                         search_data = self._parse_searched_item(elem)
                         if search_data:
                             searches.append(search_data)
                             entry_count += 1
+                        # Clear element after parsing
+                        elem.clear()
 
                     elif model_type == 'WebBookmark':
                         bookmark_data = self._parse_web_bookmark(elem)
                         if bookmark_data:
                             bookmarks.append(bookmark_data)
                             entry_count += 1
+                        # Clear element after parsing
+                        elem.clear()
 
                     # Log progress every 100 entries
                     if entry_count % 100 == 0:
                         logger.info(f"Parsed {entry_count} browsing entries...")
-
-                # Clear element to free memory
-                elem.clear()
 
             logger.info(f"Parsed {len(visited_pages)} visited pages, "
                        f"{len(searches)} searches, {len(bookmarks)} bookmarks")

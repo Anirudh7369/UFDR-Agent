@@ -6,8 +6,16 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
-load_dotenv(env_path)
+# Get the realtime directory (3 levels up: db -> utils -> realtime)
+realtime_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+env_path = os.path.join(realtime_dir, '.env')
+
+# Load .env file and verify it exists
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+    print(f"[connection] Loaded .env from: {env_path}")
+else:
+    print(f"[connection] WARNING: .env file not found at: {env_path}")
 
 logger = logging.getLogger(__name__)
 

@@ -22,8 +22,16 @@ import urllib.request
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-load_dotenv(env_path)
+# Get the realtime directory (parent of worker directory)
+realtime_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env_path = os.path.join(realtime_dir, '.env')
+
+# Load .env file and verify it exists
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+    print(f"[ufdr_extractor] Loaded .env from: {env_path}")
+else:
+    print(f"[ufdr_extractor] WARNING: .env file not found at: {env_path}")
 
 # Configure logging
 logging.basicConfig(
@@ -64,7 +72,7 @@ class UFDRWhatsAppExtractor:
         Download UFDR file from MinIO URL to temporary file.
 
         Args:
-            url: MinIO URL to download from
+            url: MinIO URL to download from (format: http://host:port/bucket/key)
 
         Returns:
             str: Path to downloaded temporary file
@@ -72,12 +80,45 @@ class UFDRWhatsAppExtractor:
         try:
             logger.info(f"Downloading UFDR file from: {url}")
 
+            # Parse the MinIO URL to extract bucket and key
+            # Format: http://localhost:9000/bucket/key/path
+            from urllib.parse import urlparse, unquote
+            import boto3
+            from botocore.client import Config
+
+            parsed = urlparse(url)
+            # Remove leading slash and split into bucket and key
+            path_parts = parsed.path.lstrip('/').split('/', 1)
+            if len(path_parts) != 2:
+                raise ValueError(f"Invalid MinIO URL format: {url}")
+
+            bucket = path_parts[0]
+            key = unquote(path_parts[1])  # URL decode the key
+
+            logger.info(f"Parsed MinIO URL - Bucket: {bucket}, Key: {key}")
+
+            # Create boto3 client with credentials from environment
+            s3_endpoint = os.getenv("S3_ENDPOINT", "http://localhost:9000")
+            s3_region = os.getenv("S3_REGION", "us-east-1")
+            aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID", "minioadmin")
+            aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin")
+
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=s3_endpoint,
+                region_name=s3_region,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                config=Config(signature_version="s3v4"),
+            )
+
             # Create temp file
             temp_fd, temp_path = tempfile.mkstemp(suffix='.ufdr', prefix='ufdr_download_')
             os.close(temp_fd)
 
-            # Download file
-            urllib.request.urlretrieve(url, temp_path)
+            # Download file using boto3
+            logger.info(f"Downloading from S3: bucket={bucket}, key={key}")
+            s3.download_file(bucket, key, temp_path)
 
             file_size = os.path.getsize(temp_path)
             logger.info(f"Downloaded UFDR file: {file_size} bytes to {temp_path}")

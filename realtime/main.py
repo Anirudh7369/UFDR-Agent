@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from realtime.api.analytics import router as analytics_router
+from api.analytics import router as analytics_router
 from utils.db import init_db_pool, close_db_pool
 from dotenv import load_dotenv
-from realtime.api.uploads.routes import router as uploads_router
+from api.uploads.routes import router as uploads_router
 from contextlib import asynccontextmanager
 
 load_dotenv()

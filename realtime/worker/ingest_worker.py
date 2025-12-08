@@ -130,6 +130,56 @@ def _hgetint(key: str, field: str) -> int:
         return 0
 
 
+def _run_ufdr_extractions(upload_id: str, ufdr_path: str, job_progress_key: str):
+    """
+    Run both installed apps and call logs extraction in a single event loop.
+
+    This avoids asyncio event loop conflicts when running multiple async extractors sequentially.
+    """
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+    from realtime.worker.ufdr_apps_extractor import UFDRAppsExtractor
+    from realtime.worker.ufdr_call_logs_extractor import UFDRCallLogsExtractor
+    from realtime.utils.db import apps_operations, call_logs_operations
+
+    async def run_both_extractions():
+        """Run both extractions in the same event loop."""
+        # Extract installed apps
+        print("[worker] Starting Installed Apps extraction...")
+        try:
+            apps_extractor = UFDRAppsExtractor(ufdr_path, upload_id)
+            await apps_extractor.extract_and_load(apps_operations)
+            print("[worker] Installed Apps extraction completed successfully")
+            _hset_progress(job_progress_key, {"apps_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Installed Apps extraction failed: {e}")
+            _hset_progress(job_progress_key, {"apps_error": str(e)})
+
+        # Extract call logs
+        print("[worker] Starting Call Logs extraction...")
+        try:
+            calls_extractor = UFDRCallLogsExtractor(ufdr_path, upload_id)
+            await calls_extractor.extract_and_load(call_logs_operations)
+            print("[worker] Call Logs extraction completed successfully")
+            _hset_progress(job_progress_key, {"status": "done", "call_logs_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Call Logs extraction failed: {e}")
+            _hset_progress(job_progress_key, {"call_logs_error": str(e)})
+
+    # Run both extractions in a single event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        loop.run_until_complete(run_both_extractions())
+    except Exception as e:
+        print(f"[worker] UFDR extraction error: {e}")
+        raise
+    finally:
+        loop.close()
+
+
 def process_upload(upload_id: str, bucket: str, key: str):
     """
     RQ will call this. Streams the object to a temp file and does a simple unzip
@@ -240,29 +290,15 @@ def process_upload(upload_id: str, bucket: str, key: str):
             # Use the already-downloaded tmpfile to avoid re-downloading the 8GB file
             print(f"[worker] Using local UFDR file: {tmpfile}")
 
-            # Extract Installed Apps data
-            print("[worker] Starting Installed Apps extraction from UFDR...")
+            # Run both extractions in a single event loop to avoid asyncio conflicts
+            print("[worker] Starting UFDR data extraction (apps + call logs)...")
             try:
-                from realtime.worker.ufdr_apps_extractor import extract_apps_from_ufdr
-                extract_apps_from_ufdr(upload_id, tmpfile)
-                print("[worker] Installed Apps extraction completed successfully")
-                _hset_progress(job_progress_key, {"apps_extracted": "true"})
+                _run_ufdr_extractions(upload_id, tmpfile, job_progress_key)
+                print("[worker] UFDR data extraction completed successfully")
             except Exception as e:
-                print(f"[worker] Installed Apps extraction failed: {e}")
-                _hset_progress(job_progress_key, {"apps_error": str(e)})
-                # Don't fail the entire job if Apps extraction fails
-
-            # Extract Call Logs data
-            print("[worker] Starting Call Logs extraction from UFDR...")
-            try:
-                from realtime.worker.ufdr_call_logs_extractor import extract_call_logs_from_ufdr
-                extract_call_logs_from_ufdr(upload_id, tmpfile)
-                print("[worker] Call Logs extraction completed successfully")
-                _hset_progress(job_progress_key, {"status": "done", "call_logs_extracted": "true"})
-            except Exception as e:
-                print(f"[worker] Call Logs extraction failed: {e}")
-                _hset_progress(job_progress_key, {"call_logs_error": str(e)})
-                # Don't fail the entire job if Call Logs extraction fails
+                print(f"[worker] UFDR data extraction failed: {e}")
+                _hset_progress(job_progress_key, {"extraction_error": str(e)})
+                # Don't fail the entire job if extraction fails
         else:
             # mark complete in redis (processed should be int)
             processed_val = _hgetint(job_progress_key, "processed")

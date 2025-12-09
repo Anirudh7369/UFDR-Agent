@@ -7,6 +7,12 @@ from dotenv import load_dotenv
 from agents import Agent, Runner
 from agents.extensions.models.litellm_model import LitellmModel
 from utils.prompts.Forensic_agent import forensic_agent_instructions
+from tools.location import location_tool
+from tools.apps import app_tool
+from tools.call_logs import call_log_tool
+from tools.messages import message_tool
+from tools.browsing_history import browsing_history_tool
+from tools.contacts import contact_tool
 
 load_dotenv()
 
@@ -18,34 +24,51 @@ class ForensicAgent:
         """
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.model = os.getenv("GEMINI_MODEL", "gemini/gemini-1.5-flash")
-        
+
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY environment variable is required")
-        
+
+        # Debug: Print tool information
+        print("=" * 80)
+        print("🔧 FORENSIC AGENT INITIALIZATION")
+        print("=" * 80)
+        print(f"Tools being added:")
+        print(f"  1. {location_tool.name} - {location_tool.description}")
+        print(f"  2. {app_tool.name} - {app_tool.description}")
+        print(f"  3. {call_log_tool.name} - {call_log_tool.description}")
+        print(f"  4. {message_tool.name} - {message_tool.description}")
+        print(f"  5. {browsing_history_tool.name} - {browsing_history_tool.description}")
+        print(f"  6. {contact_tool.name} - {contact_tool.description}")
+        print("=" * 80)
+
         self.agent = Agent(
             name="ForensicAnalyst",
             instructions=forensic_agent_instructions,
             model=LitellmModel(model=self.model, api_key=self.api_key),
-            tools=[],
+            tools=[location_tool, app_tool, call_log_tool, message_tool, browsing_history_tool, contact_tool],
         )
-    
+
+        # Debug: Verify tools were added
+        print(f"Agent created with {len(self.agent.tools) if hasattr(self.agent, 'tools') else 'unknown'} tools")
+        print("=" * 80)
+
     async def analyze_forensic_data(self, user_query: str, data_chunks: Optional[List[str]] = None) -> str:
         """
         Process a forensic query by analyzing provided UFDR report data chunks.
-        
+
         Args:
             user_query: The investigator's question
             data_chunks: Optional list of UFDR report data chunks to analyze
-            
+
         Returns:
             The agent's forensic analysis response
         """
         if data_chunks is None:
             data_chunks = []
-        
+
         # Prepare the query with forensic data context
         query_with_context = f"Query: {user_query}\nForensic Data: {len(data_chunks)} data chunks available for analysis"
-        
+
         result = await Runner.run(self.agent, query_with_context)
         return result.final_output
 
@@ -53,7 +76,7 @@ class ForensicAgent:
 async def create_forensic_agent() -> ForensicAgent:
     """
     Factory function to create a ForensicAgent instance.
-    
+
     Returns:
         Configured ForensicAgent instance
     """

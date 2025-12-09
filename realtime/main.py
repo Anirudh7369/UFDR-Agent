@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from api.analytics import router as analytics_router
 from utils.db import init_db_pool, close_db_pool
 from utils.redis import init_redis_pool, close_redis_pool
 from dotenv import load_dotenv
 from api.uploads.routes import router as uploads_router
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 load_dotenv()
 
@@ -40,6 +42,13 @@ app.add_middleware(
 app.include_router(analytics_router, prefix="/api")
 
 app.include_router(uploads_router)
+
+# Mount static files for serving visualizations
+# Create the visualization directory if it doesn't exist
+viz_dir = Path("forensic_visualizations")
+viz_dir.mkdir(exist_ok=True)
+
+app.mount("/static/visualizations", StaticFiles(directory=str(viz_dir)), name="visualizations")
 
 @app.get("/")
 async def root():

@@ -45,7 +45,7 @@ CREATE TABLE contacts (
     time_created_dt TIMESTAMP, -- Converted datetime
 
     -- Additional metadata
-    notes TEXT, -- Notes about the contact
+    notes TEXT[], -- Array of notes about the contact
     interaction_statuses TEXT[], -- Array of interaction status types
     user_tags TEXT[], -- Array of user tags
 

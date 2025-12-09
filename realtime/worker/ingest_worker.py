@@ -130,10 +130,99 @@ def _hgetint(key: str, field: str) -> int:
         return 0
 
 
+def _run_ufdr_extractions(upload_id: str, ufdr_path: str, job_progress_key: str):
+    """
+    Run all UFDR extractions (apps, calls, messages, locations, browsing) in a single event loop.
+
+    This avoids asyncio event loop conflicts when running multiple async extractors sequentially.
+    """
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+    from realtime.worker.ufdr_apps_extractor import UFDRAppsExtractor
+    from realtime.worker.ufdr_call_logs_extractor import UFDRCallLogsExtractor
+    from realtime.worker.ufdr_messages_extractor import UFDRMessagesExtractor
+    from realtime.worker.ufdr_locations_extractor import UFDRLocationsExtractor
+    from realtime.worker.ufdr_browsing_extractor import UFDRBrowsingExtractor
+    from realtime.utils.db import apps_operations, call_logs_operations, messages_operations, locations_operations, browsing_operations
+
+    async def run_all_extractions():
+        """Run all extractions in the same event loop."""
+        # Extract installed apps
+        print("[worker] Starting Installed Apps extraction...")
+        try:
+            apps_extractor = UFDRAppsExtractor(ufdr_path, upload_id)
+            await apps_extractor.extract_and_load(apps_operations)
+            print("[worker] Installed Apps extraction completed successfully")
+            _hset_progress(job_progress_key, {"apps_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Installed Apps extraction failed: {e}")
+            _hset_progress(job_progress_key, {"apps_error": str(e)})
+
+        # Extract call logs
+        print("[worker] Starting Call Logs extraction...")
+        try:
+            calls_extractor = UFDRCallLogsExtractor(ufdr_path, upload_id)
+            await calls_extractor.extract_and_load(call_logs_operations)
+            print("[worker] Call Logs extraction completed successfully")
+            _hset_progress(job_progress_key, {"call_logs_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Call Logs extraction failed: {e}")
+            _hset_progress(job_progress_key, {"call_logs_error": str(e)})
+
+        # Extract instant messages
+        print("[worker] Starting Messages extraction...")
+        try:
+            messages_extractor = UFDRMessagesExtractor(ufdr_path, upload_id)
+            await messages_extractor.extract_and_load(messages_operations)
+            print("[worker] Messages extraction completed successfully")
+            _hset_progress(job_progress_key, {"messages_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Messages extraction failed: {e}")
+            _hset_progress(job_progress_key, {"messages_error": str(e)})
+
+        # Extract location data
+        print("[worker] Starting Location extraction...")
+        try:
+            locations_extractor = UFDRLocationsExtractor(ufdr_path, upload_id)
+            await locations_extractor.extract_and_load(locations_operations)
+            print("[worker] Location extraction completed successfully")
+            _hset_progress(job_progress_key, {"locations_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Location extraction failed: {e}")
+            _hset_progress(job_progress_key, {"locations_error": str(e)})
+
+        # Extract browsing history
+        print("[worker] Starting Browsing History extraction...")
+        try:
+            browsing_extractor = UFDRBrowsingExtractor(ufdr_path, upload_id)
+            await browsing_extractor.extract_and_load(browsing_operations)
+            print("[worker] Browsing History extraction completed successfully")
+            _hset_progress(job_progress_key, {"status": "done", "browsing_extracted": "true"})
+        except Exception as e:
+            print(f"[worker] Browsing History extraction failed: {e}")
+            _hset_progress(job_progress_key, {"browsing_error": str(e)})
+
+    # Run all extractions in a single event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        loop.run_until_complete(run_all_extractions())
+    except Exception as e:
+        print(f"[worker] UFDR extraction error: {e}")
+        raise
+    finally:
+        loop.close()
+
+
 def process_upload(upload_id: str, bucket: str, key: str):
     """
     RQ will call this. Streams the object to a temp file and does a simple unzip
     (if zip-like) and extracts filenames and tiny metadata.
+
+    If the file is a UFDR file (Cellebrite), it will also extract WhatsApp data
+    and load it into PostgreSQL.
     """
     print(f"[worker] Starting processing: upload_id={upload_id} bucket={bucket} key={key}")
     job_progress_key = f"ingest_progress:{upload_id}"
@@ -149,6 +238,7 @@ def process_upload(upload_id: str, bucket: str, key: str):
     # temp workspace
     tmpdir = tempfile.mkdtemp(prefix=f"ufdr_{upload_id}_")
     tmpfile = os.path.join(tmpdir, "object.bin")
+    is_ufdr_file = False
 
     try:
         # stream object to temp file
@@ -178,6 +268,16 @@ def process_upload(upload_id: str, bucket: str, key: str):
                 with zipfile.ZipFile(tmpfile, "r") as zf:
                     namelist = zf.namelist()
                     _hset_progress(job_progress_key, {"total": len(namelist)})
+
+                    # Check if this is a UFDR file (Cellebrite format)
+                    # UFDR files contain report.xml and files/Database/ structure
+                    is_ufdr_file = any('report.xml' in name for name in namelist) and \
+                                   any('files/Database/' in name for name in namelist)
+
+                    if is_ufdr_file:
+                        print("[worker] Detected UFDR file (Cellebrite format)")
+                        _hset_progress(job_progress_key, {"status": "processing_ufdr", "message": "Extracting UFDR data"})
+
                     # extract up to first 10 small entries and create metadata
                     for i, name in enumerate(namelist[:10], start=1):
                         info = zf.getinfo(name)
@@ -217,12 +317,29 @@ def process_upload(upload_id: str, bucket: str, key: str):
             "ingested_at": now,
             "extracted_count": len(extracted),
             "extracted_samples": extracted,
+            "is_ufdr": is_ufdr_file
         }
         _update_record(upload_id, {"ingest": ingest_summary, "ingest_status": "done", "ingest_completed_at": now})
 
-        # mark complete in redis (processed should be int)
-        processed_val = _hgetint(job_progress_key, "processed")
-        _hset_progress(job_progress_key, {"status": "done", "processed": processed_val})
+        # If this is a UFDR file, trigger all extractions (apps, calls, messages)
+        if is_ufdr_file:
+            # Use the already-downloaded tmpfile to avoid re-downloading the 8GB file
+            print(f"[worker] Using local UFDR file: {tmpfile}")
+
+            # Run all extractions in a single event loop to avoid asyncio conflicts
+            print("[worker] Starting UFDR data extraction (apps + calls + messages)...")
+            try:
+                _run_ufdr_extractions(upload_id, tmpfile, job_progress_key)
+                print("[worker] UFDR data extraction completed successfully")
+            except Exception as e:
+                print(f"[worker] UFDR data extraction failed: {e}")
+                _hset_progress(job_progress_key, {"extraction_error": str(e)})
+                # Don't fail the entire job if extraction fails
+        else:
+            # mark complete in redis (processed should be int)
+            processed_val = _hgetint(job_progress_key, "processed")
+            _hset_progress(job_progress_key, {"status": "done", "processed": processed_val})
+
         print(f"[worker] Finished processing upload {upload_id}")
 
     except ClientError as e:

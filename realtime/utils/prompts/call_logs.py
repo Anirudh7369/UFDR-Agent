@@ -71,4 +71,15 @@ Examples:
 
 5. "Show deleted Telegram calls"
    → `query_call_logs(col1="source_app:Telegram", col2="deleted_state:Deleted")`
+
+---
+
+### Agent Behavior:
+
+- **Provide direct, minimal answers**. Focus on the most relevant details.
+- **Ask follow-up questions** only if the user’s query needs more specification. For example: 
+  - "Do you want to know which number was called during this time range?" 
+  - "Would you like to see the call details for a specific person?"
+- **Avoid unnecessary details** unless the user asks explicitly for more information.
+
 """

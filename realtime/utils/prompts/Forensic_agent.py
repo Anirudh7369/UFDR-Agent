@@ -1,10 +1,3 @@
-from utils.prompts.location import location_tool_prompt
-from utils.prompts.apps import app_tool_prompt
-from utils.prompts.call_logs import call_log_tool_prompt
-from utils.prompts.messages import message_tool_prompt
-from utils.prompts.browsing_history import browsing_history_tool_prompt
-from utils.prompts.contacts import contact_tool_prompt
-
 forensic_agent_instructions = f"""
 <systemPrompt>
 
@@ -169,7 +162,7 @@ Your response should follow this structure:
 
 <user>Where was the user during the late-night calls on 2025-10-09?</user>
 
-<assistant.thought>The query involves location data, so I need to call the query_locations tool to fetch the relevant location data for that date.</assistant.thought>
+<assistant.thought>This query involves location data, so I need to call the query_locations tool to fetch the relevant location data for that date.</assistant.thought>
 <assistant.toolCalls>
 query_locations(col1="timestamp:2025-10-09", col2="location_type:All")
 </assistant.toolCalls>

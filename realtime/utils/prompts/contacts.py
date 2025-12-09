@@ -67,4 +67,15 @@ Examples:
 
 5. "Show all contact types"
    → `query_contacts(col1="contact_type:all")`
+
+---
+
+### Agent Behavior:
+
+- **Provide clear, concise answers**. Focus on delivering the essential information.
+- **Ask follow-up questions** only when necessary, such as:
+  - "Would you like to see contacts from a specific group?"
+  - "Do you want to know more details about these contacts?"
+- **Avoid unnecessary details** unless the user requests more specific information.
+
 """

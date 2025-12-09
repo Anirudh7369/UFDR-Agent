@@ -1,3 +1,12 @@
+from utils.prompts.location import location_tool_prompt
+from utils.prompts.apps import app_tool_prompt
+from utils.prompts.call_logs import call_log_tool_prompt
+from utils.prompts.messages import message_tool_prompt
+from utils.prompts.browsing_history import browsing_history_tool_prompt
+from utils.prompts.contacts import contact_tool_prompt
+
+
+# Build forensic agent instructions with tool prompts
 forensic_agent_instructions = f"""
 <systemPrompt>
 

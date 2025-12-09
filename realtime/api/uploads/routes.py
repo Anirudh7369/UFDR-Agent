@@ -451,7 +451,8 @@ def extraction_status(upload_id: str):
             "call_logs": {"status": "completed", "extracted": true},
             "messages": {"status": "completed", "extracted": true},
             "locations": {"status": "completed", "extracted": true},
-            "browsing": {"status": "completed", "extracted": true}
+            "browsing": {"status": "completed", "extracted": true},
+            "contacts": {"status": "completed", "extracted": true}
         },
         "overall_status": "completed",
         "message": "All extractions completed successfully"
@@ -509,6 +510,10 @@ def extraction_status(upload_id: str):
                 "browsing": {
                     "status": "completed" if progress.get("browsing_extracted") == "true" else "processing",
                     "extracted": progress.get("browsing_extracted") == "true"
+                },
+                "contacts": {
+                    "status": "completed" if progress.get("contacts_extracted") == "true" else "processing",
+                    "extracted": progress.get("contacts_extracted") == "true"
                 }
             }
 
@@ -518,7 +523,7 @@ def extraction_status(upload_id: str):
 
             # Add error information if any
             errors = {}
-            for ext_type in ["apps", "call_logs", "messages", "locations", "browsing"]:
+            for ext_type in ["apps", "call_logs", "messages", "locations", "browsing", "contacts"]:
                 error_key = f"{ext_type}_error"
                 if error_key in progress:
                     errors[ext_type] = progress[error_key]

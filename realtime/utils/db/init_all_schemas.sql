@@ -20,4 +20,7 @@
 \echo 'Initializing Browsing Schema...'
 \i browsing_schema.sql
 
+\echo 'Initializing Contacts Schema...'
+\i contacts_schema.sql
+
 \echo 'All schemas initialized successfully!'

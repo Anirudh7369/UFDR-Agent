@@ -326,7 +326,7 @@ Based on the analysis, the following areas warrant further investigation:
         chat_history = await get_chat_history(redis_client, payload.session_id)
 
         # Process the query using the agent with chat history
-        agent_response = await agent.analyze_forensic_data(payload.query, chat_history)
+        agent_response, tool_executions = await agent.analyze_forensic_data(payload.query, chat_history)
         
         # Log our response
         print(f"[RESPONSE] Agent response: {agent_response[:200]}..." if len(agent_response) > 200 else f"[RESPONSE] Agent response: {agent_response}")

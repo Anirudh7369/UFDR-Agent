@@ -18,9 +18,27 @@ The tool has 4 parameters:
 - **platform**: Platform (Mobile, Desktop)
 - **from_party_identifier**: Sender phone number or user ID
 - **to_party_identifier**: Recipient phone number or user ID
-- **has_attachments**: Whether the message has attachments (true, false)
+- **has_attachments**: Whether message has attachments (true, false)
 - **deleted_state**: Deletion state (Intact, Deleted)
 - **decoding_confidence**: Forensic decoding confidence (High, Medium, Low)
+- **body**: The content of the message (Text or multimedia)
+- **attachment_count**: Number of attachments in the message
+- **message_timestamp**: Timestamp of the message in Unix format
+- **message_timestamp_dt**: Timestamp of the message in ISO format
+- **from_party_name**: Name of the sender
+- **to_party_name**: Name of the recipient
+
+## Synonyms Handling
+
+The following terms can be treated as synonyms and will trigger the same response:
+
+- **"message"** can also be referred to as **"text"** or **"chat"**
+- **"deleted_state"** can be referred to as **"status"** or **"state"**
+- **"decoding_confidence"** can also be referred to as **"confidence level"** or **"decoding accuracy"**
+- **"has_attachments"** can be referred to as **"attachments"** or **"media"**
+- **"message_type"** can also be referred to as **"type"** or **"message category"**
+- **"from_party_identifier"** can be referred to as **"sender"** or **"sender_id"**
+- **"to_party_identifier"** can be referred to as **"recipient"** or **"recipient_id"**
 
 ## How to Fill Parameters Based on Query
 
@@ -34,7 +52,7 @@ Examples:
 - User: "Show Instagram messages with attachments" → `col1="source_app:Instagram", col2="has_attachments:true"`
 
 ### For getting ALL values from a column:
-Use format: `column:all` - ONLY when the user wants to see all unique values
+Use format: `column:all` - ONLY when user wants to see all unique values
 
 Examples:
 - User: "What apps have messages?" → `col1="source_app:all"`
@@ -70,14 +88,4 @@ Examples:
 
 5. "Show SMS messages"
    → `query_messages(col1="message_type:SMS")`
-
----
-
-### Agent Behavior:
-
-- **Always respond with minimal, relevant information.**
-- **Ask clarifying questions** only if necessary. For example:
-  - "Would you like to see messages from a specific sender or recipient?"
-  - "Do you want to narrow the results by a particular platform or message type?"
-- **Avoid unnecessary details** unless explicitly requested by the user.
 """

@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from typing import Dict, Any, Optional
+import redis.asyncio as redis
 from datetime import datetime, timezone
 import logging
 import sys
@@ -8,6 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from utils.time import is_valid_timestamp
 from utils.ai.agent import create_forensic_agent
 from utils.db import save_feedback
+from utils.redis import get_redis_client
+from utils.chat_session import get_chat_history, save_chat_message
 from schemas.objects import AnalyticsPayload, AnalyticsResponse
 from dotenv import load_dotenv
 
@@ -24,7 +27,10 @@ async def analytics_options():
     return {"status": "ok"}
 
 @router.post("/analytics", response_model=AnalyticsResponse)
-async def analytics_endpoint(payload: AnalyticsPayload) -> AnalyticsResponse:
+async def analytics_endpoint(
+    payload: AnalyticsPayload,
+    redis_client: Optional[redis.Redis] = Depends(get_redis_client),
+) -> AnalyticsResponse:
     """
     Analytics endpoint that receives data from the frontend.
     
@@ -57,12 +63,20 @@ async def analytics_endpoint(payload: AnalyticsPayload) -> AnalyticsResponse:
 
         agent = await create_forensic_agent()
 
-        # Process the query using the agent
-        agent_response = await agent.analyze_forensic_data(payload.query)
+        # Get chat history from Redis for context (best-effort)
+        chat_history = await get_chat_history(redis_client, payload.session_id)
+
+        # Process the query using the agent with chat history
+        agent_response = await agent.analyze_forensic_data(payload.query, chat_history)
         
         # Log our response
         print(f"[RESPONSE] Agent response: {agent_response[:200]}..." if len(agent_response) > 200 else f"[RESPONSE] Agent response: {agent_response}")
         logger.info(f"Agent response: {agent_response[:200]}..." if len(agent_response) > 200 else f"Agent response: {agent_response}")
+
+        # Save the user message and AI response to the chat history (best-effort)
+        await save_chat_message(
+            redis_client, payload.session_id, payload.query, agent_response
+        )
 
         # Process the analytics data here
         response_data = AnalyticsResponse(

@@ -30,7 +30,7 @@ class ForensicAgent:
 
         # Debug: Print tool information
         print("=" * 80)
-        print("🔧 FORENSIC AGENT INITIALIZATION")
+        print("FORENSIC AGENT INITIALIZATION")
         print("=" * 80)
         print(f"Tools being added:")
         print(f"  1. {location_tool.name} - {location_tool.description}")
@@ -52,12 +52,18 @@ class ForensicAgent:
         print(f"Agent created with {len(self.agent.tools) if hasattr(self.agent, 'tools') else 'unknown'} tools")
         print("=" * 80)
 
-    async def analyze_forensic_data(self, user_query: str, data_chunks: Optional[List[str]] = None) -> str:
+    async def analyze_forensic_data(
+        self,
+        user_query: str,
+        chat_history: str = "",
+        data_chunks: Optional[List[str]] = None
+    ) -> str:
         """
         Process a forensic query by analyzing provided UFDR report data chunks.
 
         Args:
             user_query: The investigator's question
+            chat_history: Prior conversation for context
             data_chunks: Optional list of UFDR report data chunks to analyze
 
         Returns:
@@ -66,8 +72,17 @@ class ForensicAgent:
         if data_chunks is None:
             data_chunks = []
 
-        # Prepare the query with forensic data context
-        query_with_context = f"Query: {user_query}\nForensic Data: {len(data_chunks)} data chunks available for analysis"
+        # Build a structured prompt so chat history is actually used
+        sections: List[str] = []
+        if chat_history:
+            sections.append(
+                "Prior Chat Context (use this for follow-ups, pronouns, and continuity):\n"
+                + chat_history
+            )
+        sections.append("Current User Query:\n" + user_query)
+        sections.append(f"Forensic Data Summary: {len(data_chunks)} data chunks available for analysis.")
+
+        query_with_context = "\n\n".join(sections)
 
         result = await Runner.run(self.agent, query_with_context)
         return result.final_output

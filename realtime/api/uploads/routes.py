@@ -434,3 +434,129 @@ def ingest_progress(upload_id: str):
         pass
 
     raise HTTPException(status_code=404, detail="Upload not found or no progress available")
+
+
+@router.get("/{upload_id}/extraction-status")
+def extraction_status(upload_id: str):
+    """
+    Returns extraction status for all UFDR data types.
+    Frontend can poll this endpoint to know when all extractions are complete.
+
+    Response:
+    {
+        "status": "completed"|"processing"|"failed"|"not_started",
+        "upload_id": "...",
+        "extractions": {
+            "apps": {"status": "completed", "extracted": true},
+            "call_logs": {"status": "completed", "extracted": true},
+            "messages": {"status": "completed", "extracted": true},
+            "locations": {"status": "completed", "extracted": true},
+            "browsing": {"status": "completed", "extracted": true}
+        },
+        "overall_status": "completed",
+        "message": "All extractions completed successfully"
+    }
+    """
+    # Try Redis first for real-time status
+    try:
+        r = redis.from_url(REDIS_URL)
+        key = f"ingest_progress:{upload_id}"
+
+        if r.exists(key):
+            raw = r.hgetall(key)
+
+            # Handle async Redis clients
+            if inspect.isawaitable(raw):
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        raw = asyncio.new_event_loop().run_until_complete(raw)
+                    else:
+                        raw = loop.run_until_complete(raw)
+                except RuntimeError:
+                    raw = asyncio.new_event_loop().run_until_complete(raw)
+
+            # Decode Redis bytes to strings
+            progress: Dict[str, Any] = {}
+            for k, v in raw.items():
+                if isinstance(k, bytes):
+                    k = k.decode()
+                if isinstance(v, bytes):
+                    v = v.decode()
+                progress[k] = v
+
+            # Build extraction status response
+            status = progress.get("status", "processing")
+
+            # Check individual extraction flags
+            extractions = {
+                "apps": {
+                    "status": "completed" if progress.get("apps_extracted") == "true" else "processing",
+                    "extracted": progress.get("apps_extracted") == "true"
+                },
+                "call_logs": {
+                    "status": "completed" if progress.get("call_logs_extracted") == "true" else "processing",
+                    "extracted": progress.get("call_logs_extracted") == "true"
+                },
+                "messages": {
+                    "status": "completed" if progress.get("messages_extracted") == "true" else "processing",
+                    "extracted": progress.get("messages_extracted") == "true"
+                },
+                "locations": {
+                    "status": "completed" if progress.get("locations_extracted") == "true" else "processing",
+                    "extracted": progress.get("locations_extracted") == "true"
+                },
+                "browsing": {
+                    "status": "completed" if progress.get("browsing_extracted") == "true" else "processing",
+                    "extracted": progress.get("browsing_extracted") == "true"
+                }
+            }
+
+            # Determine overall status
+            all_completed = all(ext.get("extracted") for ext in extractions.values())
+            overall_status = "completed" if (status == "done" and all_completed) else status
+
+            # Add error information if any
+            errors = {}
+            for ext_type in ["apps", "call_logs", "messages", "locations", "browsing"]:
+                error_key = f"{ext_type}_error"
+                if error_key in progress:
+                    errors[ext_type] = progress[error_key]
+
+            response = {
+                "status": overall_status,
+                "upload_id": upload_id,
+                "extractions": extractions,
+                "overall_status": overall_status,
+                "message": "All extractions completed successfully" if overall_status == "completed" else "Extraction in progress"
+            }
+
+            if errors:
+                response["errors"] = errors
+                response["message"] = "Some extractions failed"
+                response["overall_status"] = "failed"
+
+            return response
+
+    except Exception as e:
+        print(f"Error checking Redis extraction status: {e}")
+        # Fall through to file-based check
+
+    # Fallback to file-based status check
+    try:
+        if os.path.exists(UPLOADS_JSON):
+            with open(UPLOADS_JSON, "r", encoding="utf-8") as f:
+                allr = json.load(f)
+            rec = allr.get(upload_id)
+            if rec:
+                status = rec.get("status", "not_started")
+                return {
+                    "status": status,
+                    "upload_id": upload_id,
+                    "overall_status": status,
+                    "message": f"Extraction status: {status}"
+                }
+    except Exception as e:
+        print(f"Error checking file-based extraction status: {e}")
+
+    raise HTTPException(status_code=404, detail="Upload not found or extraction status unavailable")

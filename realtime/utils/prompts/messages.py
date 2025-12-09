@@ -18,7 +18,7 @@ The tool has 4 parameters:
 - **platform**: Platform (Mobile, Desktop)
 - **from_party_identifier**: Sender phone number or user ID
 - **to_party_identifier**: Recipient phone number or user ID
-- **has_attachments**: Whether message has attachments (true, false)
+- **has_attachments**: Whether the message has attachments (true, false)
 - **deleted_state**: Deletion state (Intact, Deleted)
 - **decoding_confidence**: Forensic decoding confidence (High, Medium, Low)
 
@@ -34,7 +34,7 @@ Examples:
 - User: "Show Instagram messages with attachments" → `col1="source_app:Instagram", col2="has_attachments:true"`
 
 ### For getting ALL values from a column:
-Use format: `column:all` - ONLY when user wants to see all unique values
+Use format: `column:all` - ONLY when the user wants to see all unique values
 
 Examples:
 - User: "What apps have messages?" → `col1="source_app:all"`
@@ -70,4 +70,14 @@ Examples:
 
 5. "Show SMS messages"
    → `query_messages(col1="message_type:SMS")`
+
+---
+
+### Agent Behavior:
+
+- **Always respond with minimal, relevant information.**
+- **Ask clarifying questions** only if necessary. For example:
+  - "Would you like to see messages from a specific sender or recipient?"
+  - "Do you want to narrow the results by a particular platform or message type?"
+- **Avoid unnecessary details** unless explicitly requested by the user.
 """

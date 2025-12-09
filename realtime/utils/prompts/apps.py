@@ -17,11 +17,39 @@ The tool has 4 parameters:
 - **app_name**: User-visible app name (WhatsApp Messenger, Instagram, Facebook, etc.)
 - **app_version**: Version string (2.23.10.75, 8.61.0.96, etc.)
 - **app_guid**: App GUID if available
+- **install_timestamp**: Timestamp when the app was installed (Unix format)
+- **install_timestamp_dt**: Timestamp when the app was installed (ISO format)
+- **last_launched_timestamp**: Timestamp of the last time the app was launched (Unix format)
+- **last_launched_dt**: Timestamp of the last time the app was launched (ISO format)
 - **decoding_status**: Decoding status (Decoded, NotDecoded, PartiallyDecoded, etc.)
 - **is_emulatable**: Whether app is emulatable (true, false)
 - **operation_mode**: App operation mode (Foreground, Background, etc.)
 - **deleted_state**: Deletion state (Intact, Deleted, etc.)
 - **decoding_confidence**: Forensic decoding confidence (High, Medium, Low)
+- **permissions**: Permissions required by the app
+- **categories**: Categories the app belongs to (e.g., "Social Media", "Productivity", etc.)
+- **associated_directory_paths**: Directory paths associated with the app
+- **raw_xml**: Raw XML data associated with the app
+- **raw_json**: Raw JSON data associated with the app
+- **created_at**: Timestamp when the app data was created (Unix format)
+- **updated_at**: Timestamp when the app data was last updated (Unix format)
+
+## Synonyms Handling
+
+The following terms can be treated as synonyms and will trigger the same response:
+
+- **"app"** can also be referred to as **"application"** or **"software"**
+- **"app_name"** can be referred to as **"application_name"** or **"software_name"**
+- **"app_version"** can also be referred to as **"version"** or **"version_string"**
+- **"install_timestamp"** can be referred to as **"install_time"** or **"installation_time"**
+- **"last_launched_timestamp"** can also be referred to as **"last_opened_time"** or **"last_used_timestamp"**
+- **"decoding_status"** can be referred to as **"decoding_state"** or **"status"**
+- **"is_emulatable"** can also be referred to as **"emulation_status"** or **"can_be_emulated"**
+- **"operation_mode"** can be referred to as **"app_state"** or **"state_of_operation"**
+- **"deleted_state"** can be referred to as **"status"** or **"state_of_deletion"**
+- **"decoding_confidence"** can also be referred to as **"confidence_level"** or **"decoding_accuracy"**
+- **"permissions"** can be referred to as **"app_permissions"** or **"access_rights"**
+- **"categories"** can be referred to as **"app_categories"** or **"software_categories"**
 
 ## How to Fill Parameters Based on Query
 

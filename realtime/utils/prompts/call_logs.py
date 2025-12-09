@@ -13,15 +13,47 @@ The tool has 4 parameters:
 
 ## Available Columns
 
+- **call_id**: Unique identifier for the call entry
 - **source_app**: App that made the call (WhatsApp, Telegram, Phone, Skype, Viber, etc.)
 - **direction**: Call direction (Incoming, Outgoing)
 - **call_type**: Type of call (Voice, Video)
 - **status**: Call status (Established, Missed, Rejected, Cancelled, etc.)
 - **is_video_call**: Whether this is a video call (true, false)
 - **from_party_identifier**: Caller phone number or user ID
+- **from_party_name**: Name of the caller
+- **from_party_is_owner**: Whether the caller is the owner (true, false)
 - **to_party_identifier**: Recipient phone number or user ID
+- **to_party_name**: Name of the recipient
+- **to_party_is_owner**: Whether the recipient is the owner (true, false)
 - **deleted_state**: Deletion state (Intact, Deleted)
 - **decoding_confidence**: Forensic decoding confidence (High, Medium, Low)
+- **call_timestamp**: Timestamp of the call (Unix format)
+- **call_timestamp_dt**: Timestamp of the call (ISO format)
+- **duration_seconds**: Duration of the call in seconds
+- **duration_string**: Duration of the call in string format (e.g., "5 minutes")
+- **country_code**: Country code of the call
+- **network_code**: Network code used for the call
+- **network_name**: Name of the network used for the call
+- **account**: Account associated with the call
+- **raw_xml**: Raw XML data associated with the call
+- **raw_json**: Raw JSON data associated with the call
+- **created_at**: Timestamp when the call log entry was created
+- **updated_at**: Timestamp when the call log entry was last updated
+
+## Synonyms Handling
+
+The following terms can be treated as synonyms and will trigger the same response:
+
+- **"call"** can also be referred to as **"entry"** or **"call log"**
+- **"source_app"** can also be referred to as **"app"** or **"application"**
+- **"status"** can be referred to as **"call_status"** or **"state"**
+- **"direction"** can also be referred to as **"call_direction"** or **"type"**
+- **"call_type"** can be referred to as **"type_of_call"** or **"call_kind"**
+- **"from_party_identifier"** can be referred to as **"caller_id"** or **"caller_number"**
+- **"to_party_identifier"** can be referred to as **"receiver_id"** or **"receiver_number"**
+- **"deleted_state"** can be referred to as **"status"** or **"state"**
+- **"decoding_confidence"** can be referred to as **"confidence_level"** or **"decoding_accuracy"**
+- **"duration_seconds"** can also be referred to as **"duration"** or **"call_duration"**
 
 ## How to Fill Parameters Based on Query
 
@@ -29,7 +61,7 @@ The tool has 4 parameters:
 Use format: `column:value`
 
 Examples:
-- User: "Show WhatsApp calls" → `col1="source_app:WhatsApp"`
+- User: "Show all WhatsApp calls" → `col1="source_app:WhatsApp"`
 - User: "Show missed calls" → `col1="status:Missed"`
 - User: "Show incoming WhatsApp calls" → `col1="source_app:WhatsApp", col2="direction:Incoming"`
 - User: "Show video calls from Telegram" → `col1="source_app:Telegram", col2="is_video_call:true"`

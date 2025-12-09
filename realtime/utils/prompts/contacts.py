@@ -13,11 +13,37 @@ The tool has 4 parameters:
 
 ## Available Columns
 
+- **contact_id**: Unique identifier for the contact
 - **source_app**: Source app (WhatsApp, Facebook Messenger, Kik, Skype, Viber, Phone Book, etc.)
+- **service_identifier**: Identifier for the service (e.g., phone number, user ID)
+- **name**: Name of the contact
+- **account**: Account associated with the contact
 - **contact_type**: Contact type (PhoneBook, ChatParticipant, etc.)
 - **contact_group**: Contact group name
+- **time_created**: Timestamp when the contact was created (Unix format)
+- **time_created_dt**: Timestamp when the contact was created (ISO format)
+- **notes**: Notes associated with the contact
+- **interaction_statuses**: Statuses of interactions with the contact (e.g., "active", "inactive")
+- **user_tags**: Tags associated with the contact (e.g., "family", "work")
 - **deleted_state**: Deletion state (Intact, Deleted)
 - **decoding_confidence**: Forensic decoding confidence (High, Medium, Low)
+- **raw_xml**: Raw XML data associated with the contact
+- **raw_json**: Raw JSON data associated with the contact
+- **created_at**: Timestamp when the contact data was created (Unix format)
+- **updated_at**: Timestamp when the contact data was last updated (Unix format)
+
+## Synonyms Handling
+
+The following terms can be treated as synonyms and will trigger the same response:
+
+- **"contact"** can also be referred to as **"entry"**, **"person"**, or **"user"**
+- **"source_app"** can also be referred to as **"app"**, **"application"**, or **"service"**
+- **"contact_type"** can also be referred to as **"type_of_contact"**, **"entry_type"**, or **"contact_category"**
+- **"contact_group"** can also be referred to as **"group"** or **"category"**
+- **"deleted_state"** can be referred to as **"status"** or **"state_of_deletion"**
+- **"decoding_confidence"** can also be referred to as **"confidence_level"**, **"decoding_accuracy"**, or **"forensic_confidence"**
+- **"interaction_statuses"** can also be referred to as **"status_of_interaction"** or **"interaction_state"**
+- **"service_identifier"** can be referred to as **"service_id"**, **"identifier"**, or **"account_identifier"**
 
 ## How to Fill Parameters Based on Query
 
@@ -67,7 +93,6 @@ Examples:
 
 5. "Show all contact types"
    → `query_contacts(col1="contact_type:all")`
-
 ---
 
 ### Agent Behavior:
@@ -77,5 +102,4 @@ Examples:
   - "Would you like to see contacts from a specific group?"
   - "Do you want to know more details about these contacts?"
 - **Avoid unnecessary details** unless the user requests more specific information.
-
 """

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.analytics import router as analytics_router
 from utils.db import init_db_pool, close_db_pool
+from utils.redis import init_redis_pool, close_redis_pool
 from dotenv import load_dotenv
 from api.uploads.routes import router as uploads_router
 from contextlib import asynccontextmanager
@@ -10,11 +11,13 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler for database connection management"""
+    """Lifespan event handler for DB and Redis connection management"""
     # Startup
     await init_db_pool()
+    await init_redis_pool()
     yield
     # Shutdown
+    await close_redis_pool()
     await close_db_pool()
 
 app = FastAPI(

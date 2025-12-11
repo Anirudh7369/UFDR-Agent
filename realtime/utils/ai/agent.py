@@ -13,6 +13,7 @@ from tools.call_logs import call_log_tool
 from tools.messages import message_tool
 from tools.browsing_history import browsing_history_tool
 from tools.contacts import contact_tool
+from tools.vector_search import vector_search_tool
 
 load_dotenv()
 
@@ -39,13 +40,14 @@ class ForensicAgent:
         print(f"  4. {message_tool.name} - {message_tool.description}")
         print(f"  5. {browsing_history_tool.name} - {browsing_history_tool.description}")
         print(f"  6. {contact_tool.name} - {contact_tool.description}")
+        print(f"  7. {vector_search_tool.name} - {vector_search_tool.description}")
         print("=" * 80)
 
         self.agent = Agent(
             name="ForensicAnalyst",
             instructions=forensic_agent_instructions,
             model=LitellmModel(model=self.model, api_key=self.api_key),
-            tools=[location_tool, app_tool, call_log_tool, message_tool, browsing_history_tool, contact_tool],
+            tools=[location_tool, app_tool, call_log_tool, message_tool, browsing_history_tool, contact_tool, vector_search_tool],
         )
 
         # Debug: Verify tools were added
